@@ -10,20 +10,38 @@ interface VideoListProps {
 }
 
 export function VideoList({ videos, maxVideos, onRemoveVideo }: VideoListProps) {
+  // Calculate pending videos
+  const pendingVideos = videos.filter(v => v.status === 'pending');
+
+  // Sort videos by status priority: pending > uploading > error > completed
+  const statusPriority = { 'pending': 0, 'uploading': 1, 'error': 2, 'completed': 3 };
+  const sortedVideos = [...videos].sort((a, b) => {
+    return statusPriority[a.status] - statusPriority[b.status];
+  });
+
   return (
     <div>
       <h4 className="text-xs font-medium text-yt-text-secondary uppercase tracking-wider mb-3">
-        Queue ({videos.length})
+        Queue ({pendingVideos.length}/{videos.length})
       </h4>
+      {pendingVideos.length > maxVideos && (
+        <div className="text-xs text-yt-text-secondary mb-2">
+          Showing all {pendingVideos.length} pending videos (batch limit: {maxVideos})
+        </div>
+      )}
       <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-        {videos.slice(0, maxVideos).map((video, index) => (
+        {sortedVideos.map((video, index) => (
           <div
             key={index}
             className="flex items-center p-2 rounded-lg hover:bg-yt-hover transition-colors group relative border border-transparent hover:border-yt-border"
           >
             {/* Remove Button */}
             <button
-              onClick={() => onRemoveVideo(index)}
+              onClick={() => {
+                // Find original index in unsorted videos array
+                const originalIndex = videos.findIndex(v => v.path === video.path);
+                if (originalIndex !== -1) onRemoveVideo(originalIndex);
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-yt-text-secondary hover:bg-yt-bg hover:text-yt-text-primary opacity-0 group-hover:opacity-100 transition-all z-10"
               title="Remove video"
               disabled={video.status === 'uploading'}
@@ -52,7 +70,18 @@ export function VideoList({ videos, maxVideos, onRemoveVideo }: VideoListProps) 
             {/* Info */}
             <div className="flex-1 min-w-0 pr-6">
               <p className="text-xs font-medium text-yt-text-primary truncate">{video.name}</p>
-              <p className="text-[10px] text-yt-text-secondary">{video.size}</p>
+              <p className="text-[10px] text-yt-text-secondary">
+                {video.size}
+                {video.status !== 'pending' && (
+                  <span className={`ml-2 px-1 py-0.5 rounded text-[9px] ${
+                    video.status === 'completed' ? 'bg-green-500/20 text-green-500' :
+                    video.status === 'error' ? 'bg-red-500/20 text-red-500' :
+                    'bg-blue-500/20 text-blue-500'
+                  }`}>
+                    {video.status}
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         ))}

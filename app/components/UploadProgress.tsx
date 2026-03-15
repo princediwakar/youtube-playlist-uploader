@@ -41,7 +41,11 @@ export function UploadProgress({
   completedUploads,
   onRemoveVideo
 }: UploadProgressProps) {
-  const progressPercentage = totalVideos > 0 ? (completedUploads / totalVideos) * 100 : 100;
+  const pendingVideos = videos.filter(v => v.status === 'pending');
+  const completedVideos = videos.filter(v => v.status === 'completed');
+  const totalVideosCount = videos.length;
+  const overallPercentage = totalVideosCount > 0 ? (completedVideos.length / totalVideosCount) * 100 : 100;
+  const batchLimit = uploadSettings.maxVideos;
 
   // If no videos, show empty state
   if (videos.length === 0) {
@@ -69,14 +73,20 @@ export function UploadProgress({
         {/* Overall Progress */}
         <div>
           <div className="flex items-center justify-between text-sm text-yt-text-secondary mb-2">
-            <span>Ready to Upload...</span>
-            <span className="font-medium text-yt-text-primary">{completedUploads} of {totalVideos}</span>
+            <span>Overall Progress</span>
+            <span className="font-medium text-yt-text-primary">{completedVideos.length} of {totalVideosCount}</span>
           </div>
           <div className="h-1 bg-yt-bg rounded-full overflow-hidden">
             <div
               className="h-full bg-yt-blue transition-all duration-300 rounded-full"
-              style={{ width: `${progressPercentage}%` }}
+              style={{ width: `${overallPercentage}%` }}
             />
+          </div>
+          <div className="flex items-center justify-between text-xs text-yt-text-secondary mt-2">
+            <span>Pending: {pendingVideos.length} video{pendingVideos.length !== 1 ? 's' : ''}</span>
+            {pendingVideos.length > batchLimit && (
+              <span className="text-yt-text-primary">Batch limit: {batchLimit}</span>
+            )}
           </div>
         </div>
 

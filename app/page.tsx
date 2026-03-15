@@ -270,7 +270,7 @@ export default function HomePage() {
 
   const pendingVideos = videos.filter(v => v.status === 'pending');
   const completedUploads = videos.filter(v => v.status === 'completed').length;
-  const totalVideos = Math.min(pendingVideos.length, uploadSettings.maxVideos);
+  const totalVideos = videos.length;
 
   return (
     <div className="min-h-screen relative font-sans text-gray-300 selection:bg-youtube-neon selection:text-black pb-8 overflow-x-hidden">
