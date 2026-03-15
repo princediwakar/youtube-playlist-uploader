@@ -51,7 +51,7 @@ export default function HomePage() {
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null)
   const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
     playlistName: '',
-    privacyStatus: 'unlisted',
+    privacyStatus: 'public',
     maxVideos: 10,
     contentType: 'auto',
     // Upload mode
@@ -112,7 +112,7 @@ export default function HomePage() {
     if (!session) return
 
     try {
-      const initialVideosToProcess = videos.slice(0, uploadSettings.maxVideos)
+      const initialVideosToProcess = videos.filter(v => v.status === 'pending').slice(0, uploadSettings.maxVideos)
       
       // Phase 1: Playlist management & fetch existing videos
       let playlistId: string | null = null
@@ -163,15 +163,18 @@ export default function HomePage() {
       // Phase 2: Filter duplicates BEFORE pre-processing
       let videosToProcess = initialVideosToProcess
       if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist && existingVideos.length > 0) {
-        videosToProcess = checkForDuplicateVideos(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix)
+        videosToProcess = checkForDuplicateVideos(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix, uploadSettings.useAiAnalysis)
         
         const skippedCount = initialVideosToProcess.length - videosToProcess.length
         if (skippedCount > 0) {
           console.log(`Filtered ${skippedCount} duplicate videos before processing`)
           // Mark skipped videos as completed visually
-          const skippedVideos = initialVideosToProcess.filter(v => !videosToProcess.includes(v))
-          setVideos(prev => prev.map(v => 
-            skippedVideos.includes(v) ? { ...v, status: 'completed', progress: 100 } : v
+          const videosToProcessPaths = new Set(videosToProcess.map(v => v.path))
+          const skippedPaths = initialVideosToProcess
+            .filter(v => !videosToProcessPaths.has(v.path))
+            .map(v => v.path)
+          setVideos(prev => prev.map(v =>
+            skippedPaths.includes(v.path) ? { ...v, status: 'completed', progress: 100 } : v
           ))
         }
       }
@@ -183,12 +186,13 @@ export default function HomePage() {
       let positions: number[] = []
       if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist) {
         // Compute positions for all initial videos
-        const allPositions = calculateInsertionPositions(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix)
-        // Map to videosToProcess (non-duplicates)
-        positions = videosToProcess.map(video => {
-          const index = initialVideosToProcess.indexOf(video)
-          return allPositions[index]
+        const allPositions = calculateInsertionPositions(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix, uploadSettings.useAiAnalysis)
+        // Map to videosToProcess (non-duplicates) using path for reliable lookup
+        const positionMap = new Map<string, number>()
+        initialVideosToProcess.forEach((video, index) => {
+          positionMap.set(video.path, allPositions[index])
         })
+        positions = videosToProcess.map(video => positionMap.get(video.path) || 0)
       } else {
         // New playlist or individual upload: positions start from 0
         positions = processedVideos.map((_, index) => index)
@@ -264,8 +268,9 @@ export default function HomePage() {
     }
   }
 
-  const completedUploads = videos.filter(v => v.status === 'completed').length
-  const totalVideos = Math.min(videos.length, uploadSettings.maxVideos)
+  const pendingVideos = videos.filter(v => v.status === 'pending');
+  const completedUploads = videos.filter(v => v.status === 'completed').length;
+  const totalVideos = Math.min(pendingVideos.length, uploadSettings.maxVideos);
 
   return (
     <div className="min-h-screen relative font-sans text-gray-300 selection:bg-youtube-neon selection:text-black pb-8 overflow-x-hidden">
@@ -532,7 +537,7 @@ export default function HomePage() {
                   onUpload={handleOptimizedUpload}
                   isUploading={isUploading}
                   totalVideos={videos.length}
-                  totalQueued={Math.min(videos.length, uploadSettings.maxVideos)}
+                  totalQueued={Math.min(pendingVideos.length, uploadSettings.maxVideos)}
                 />
               )}
             </div>

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { YouTubeApiService } from '../../../../app/services/youtubeApi'
 import { analyzeContent } from '../../../../app/services/aiService'
+import path from 'path'
 import {
   generateTitle,
   generateFallbackDescription,
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
     // Parse form data
     const formData = await request.formData()
     const videoFile = formData.get('video') as File
+    const originalFilename = videoFile.name
+    const sanitizedFilename = path.basename(originalFilename)
     const title = formData.get('title') as string
     const contentType = formData.get('contentType') as string || 'auto'
     const privacyStatus = formData.get('privacyStatus') as string || 'unlisted'
@@ -62,7 +65,8 @@ export async function POST(request: NextRequest) {
     const aspectRatio = parseFloat(formData.get('aspectRatio') as string || '1.78')
 
     console.log('Upload request data:', {
-      fileName: videoFile?.name,
+      fileName: originalFilename,
+      sanitizedFileName: sanitizedFilename,
       title,
       relativePath,
       folderStructure,
@@ -85,8 +89,10 @@ export async function POST(request: NextRequest) {
     try {
       allFiles = JSON.parse(allFileNames)
     } catch {
-      allFiles = [videoFile.name]
+      allFiles = [sanitizedFilename]
     }
+    // Sanitize all filenames (remove path components)
+    allFiles = allFiles.map(file => path.basename(file))
     
     // AI Analysis Phase (blocking during upload)
     let finalTitle: string
@@ -95,12 +101,12 @@ export async function POST(request: NextRequest) {
     let finalCategory = category
     
     if (useAiAnalysis) {
-      console.log('🤖 Starting AI analysis for:', videoFile.name)
+      console.log('🤖 Starting AI analysis for:', sanitizedFilename)
       try {
         const aiAnalysis = await analyzeContent(
           folderName,
           allFiles,
-          videoFile.name,
+          sanitizedFilename,
           relativePath
         )
         
@@ -113,9 +119,9 @@ export async function POST(request: NextRequest) {
         
         // Use AI-generated title based on format preference
         if (titleFormat === 'original') {
-          finalTitle = cleanAIGeneratedTitle(aiAnalysis.videoTitle, videoFile.name)
+          finalTitle = cleanAIGeneratedTitle(aiAnalysis.videoTitle, sanitizedFilename)
         } else {
-          finalTitle = generateTitle(videoFile.name, titleFormat, customTitlePrefix, customTitleSuffix)
+          finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
         }
         
         description = aiAnalysis.videoDescription
@@ -125,16 +131,16 @@ export async function POST(request: NextRequest) {
       } catch (aiError) {
         console.error('AI analysis failed, using fallback:', aiError)
         // Fallback to basic metadata if AI fails
-        finalTitle = generateTitle(videoFile.name, titleFormat, customTitlePrefix, customTitleSuffix)
-        description = generateFallbackDescription(videoFile.name, folderName, relativePath)
-        tags = generateBasicTags(videoFile.name, folderName)
+        finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
+        description = generateFallbackDescription(sanitizedFilename, folderName, relativePath)
+        tags = generateBasicTags(sanitizedFilename, folderName)
         finalCategory = detectCategoryFromContent(folderName, allFiles, relativePath)
       }
     } else {
       // No AI analysis - use basic metadata
-      finalTitle = generateTitle(videoFile.name, titleFormat, customTitlePrefix, customTitleSuffix)
-      description = generateFallbackDescription(videoFile.name, folderName, relativePath)
-      tags = generateBasicTags(videoFile.name, folderName)
+      finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
+      description = generateFallbackDescription(sanitizedFilename, folderName, relativePath)
+      tags = generateBasicTags(sanitizedFilename, folderName)
       
       // Quick category detection (non-AI) if still default
       if (category === '27') {
@@ -144,7 +150,7 @@ export async function POST(request: NextRequest) {
     
     // Optimize for YouTube Shorts
     if (isShort && duration <= 60 && aspectRatio <= 1.0) {
-      description = generateShortsDescription(videoFile.name, description)
+      description = generateShortsDescription(sanitizedFilename, description)
       tags = [...tags, 'shorts', 'short', 'vertical', 'mobile'].slice(0, 10)
       // Use Entertainment category for Shorts unless user explicitly chose a different category
       if (finalCategory === '27') {
@@ -177,7 +183,7 @@ export async function POST(request: NextRequest) {
       // Upload video to YouTube using service
       const uploadResponse = await youtubeApi.uploadVideo(
         buffer,
-        videoFile.name,
+        sanitizedFilename,
         {
           title: finalTitle,
           description: description,

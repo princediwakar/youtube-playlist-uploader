@@ -1,4 +1,5 @@
 import { google } from 'googleapis'
+import path from 'path'
 
 export interface VideoMetadata {
   title: string
@@ -44,9 +45,12 @@ export class YouTubeApiService {
     filename: string,
     metadata: VideoMetadata
   ): Promise<UploadResponse> {
-    const tempFilePath = `/tmp/${Date.now()}-${filename}`
-    const fs = await import('fs')
-    const { v4: uuidv4 } = await import('uuid')
+    // Extract basename and sanitize filename (remove path separators)
+    const basename = path.basename(filename).replace(/[\/\\]/g, '_');
+    const tempFilePath = `/tmp/${Date.now()}-${basename}`;
+    console.log('Writing temporary video file:', { filename, basename, tempFilePath });
+    const fs = await import('fs');
+    const { v4: uuidv4 } = await import('uuid');
 
     try {
       fs.writeFileSync(tempFilePath, fileBuffer)

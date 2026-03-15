@@ -1,5 +1,12 @@
 import { VideoFile } from '@/app/types/video'
 
+// Cross-platform basename extraction (works in browser and Node.js)
+export function getBasename(filename: string): string {
+  // Handle both forward and backward slashes
+  const lastSlash = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'))
+  return lastSlash === -1 ? filename : filename.substring(lastSlash + 1)
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
   const k = 1024
@@ -504,12 +511,15 @@ export function checkForDuplicateVideos(
   existingVideos: Array<{videoId: string, title: string, position: number}>,
   titleFormat: string,
   customTitlePrefix: string,
-  customTitleSuffix: string
+  customTitleSuffix: string,
+  useAiAnalysis?: boolean
 ): VideoFile[] {
   if (existingVideos.length === 0) return videos
 
   return videos.filter(video => {
-    const videoTitle = generateTitle(video.file.name, titleFormat, customTitlePrefix, customTitleSuffix)
+    // Use basename for consistency with upload route
+    const basename = getBasename(video.file.name)
+    const videoTitle = generateTitle(basename, titleFormat, customTitlePrefix, customTitleSuffix)
 
     // Check for exact title match
     const isDuplicate = existingVideos.some(existing => {
@@ -519,7 +529,7 @@ export function checkForDuplicateVideos(
     })
 
     if (isDuplicate) {
-      console.log(`Skipping duplicate video: ${videoTitle}`)
+      console.log(`Skipping duplicate video: ${videoTitle} (filename: ${basename})`)
     }
 
     return !isDuplicate
@@ -531,19 +541,21 @@ export function calculateInsertionPositions(
   existingVideos: Array<{videoId: string, title: string, position: number}>,
   titleFormat: string,
   customTitlePrefix: string,
-  customTitleSuffix: string
+  customTitleSuffix: string,
+  useAiAnalysis?: boolean
 ): number[] {
   if (existingVideos.length === 0) {
     // New playlist: positions start from 0
     return videos.map((_, index) => index)
   }
 
-  // Generate titles for all folder videos
-  const videoTitles = videos.map(video =>
-    generateTitle(video.file.name, titleFormat, customTitlePrefix, customTitleSuffix)
+  // Generate titles for all folder videos (use basename for consistency)
+  const videoTitles = videos.map(video => {
+    const basename = getBasename(video.file.name)
+    return generateTitle(basename, titleFormat, customTitlePrefix, customTitleSuffix)
       .trim()
       .toLowerCase()
-  )
+  })
 
   // Map existing videos by title (lowercase)
   const existingByTitle = new Map<string, {position: number, index: number}>()

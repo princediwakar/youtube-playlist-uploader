@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { VideoFile, UploadSettings } from '@/app/types/video'
-import { generateTitle, generateFallbackDescription, generateBasicTags } from '@/app/utils/videoHelpers'
+import { generateTitle, generateFallbackDescription, generateBasicTags, getBasename } from '@/app/utils/videoHelpers'
 
 export function useVideoProcessing() {
   const { data: session } = useSession()
@@ -28,7 +28,7 @@ export function useVideoProcessing() {
   // Generate playlist description
   const generatePlaylistDescription = useCallback(async (videos: VideoFile[], uploadSettings: UploadSettings) => {
     const folderName = videos.length > 0 ? videos[0].folder : ''
-    const fileNames = videos.map(v => v.file.name)
+    const fileNames = videos.map(v => getBasename(v.file.name))
 
     // Use AI for playlist description if enabled
     if (uploadSettings.useAiAnalysis) {
@@ -181,7 +181,7 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
 
             if (uploadSettings.useAiAnalysis) {
               // AI analysis for this video
-              const allFileNames = videos.map(v => v.file.name)
+              const allFileNames = videos.map(v => getBasename(v.file.name))
               setAiProcessing(prev => ({
                 ...prev,
                 videoAnalysis: true,
@@ -194,7 +194,7 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
                 body: JSON.stringify({
                   folderName: videos.length > 0 ? videos[0].folder : '',
                   allFileNames,
-                  currentFileName: video.file.name,
+                  currentFileName: getBasename(video.file.name),
                   relativePath: video.relativePath,
                   titleFormat: uploadSettings.titleFormat,
                   customTitlePrefix: uploadSettings.customTitlePrefix,
@@ -222,9 +222,9 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
             } else {
               // Basic metadata generation
               metadata = {
-                title: generateTitle(video.file.name, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
-                description: generateFallbackDescription(video.file.name, videos.length > 0 ? videos[0].folder : '', video.relativePath),
-                tags: generateBasicTags(video.file.name, videos.length > 0 ? videos[0].folder : ''),
+                title: generateTitle(getBasename(video.file.name), uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
+                description: generateFallbackDescription(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : '', video.relativePath),
+                tags: generateBasicTags(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : ''),
                 category: uploadSettings.category
               }
             }
@@ -239,9 +239,9 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
             console.error(`Failed to process ${video.name}:`, error)
             // Return fallback metadata
             const fallbackMetadata = {
-              title: generateTitle(video.file.name, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
-              description: generateFallbackDescription(video.file.name, videos.length > 0 ? videos[0].folder : '', video.relativePath),
-              tags: generateBasicTags(video.file.name, videos.length > 0 ? videos[0].folder : ''),
+              title: generateTitle(getBasename(video.file.name), uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
+              description: generateFallbackDescription(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : '', video.relativePath),
+              tags: generateBasicTags(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : ''),
               category: uploadSettings.category
             }
 

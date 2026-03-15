@@ -41,6 +41,8 @@ export function UploadProgress({
   completedUploads,
   onRemoveVideo
 }: UploadProgressProps) {
+  const progressPercentage = totalVideos > 0 ? (completedUploads / totalVideos) * 100 : 100;
+
   // If no videos, show empty state
   if (videos.length === 0) {
     return (
@@ -73,7 +75,7 @@ export function UploadProgress({
           <div className="h-1 bg-yt-bg rounded-full overflow-hidden">
             <div
               className="h-full bg-yt-blue transition-all duration-300 rounded-full"
-              style={{ width: `${(completedUploads / totalVideos) * 100}%` }}
+              style={{ width: `${progressPercentage}%` }}
             />
           </div>
         </div>
