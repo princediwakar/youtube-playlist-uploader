@@ -5,10 +5,45 @@ import { google } from 'googleapis'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    // Check for Authorization header first (for script access)
+    const authHeader = request.headers.get('Authorization')
+    let accessToken: string | null = null
+
+    if (authHeader?.startsWith('Bearer ')) {
+      accessToken = authHeader.substring(7)
+      console.log('Using access token from Authorization header')
+    } else {
+      // Fall back to session-based authentication
+      const session = await getServerSession(authOptions)
+
+      console.log('Playlist videos session check:', {
+        sessionExists: !!session,
+        accessTokenExists: !!session?.accessToken,
+        accessTokenLength: session?.accessToken?.length,
+        sessionError: session?.error
+      })
+
+      if (!session?.accessToken) {
+        console.log('No access token available')
+        return NextResponse.json({
+          error: 'Not authenticated',
+          details: session?.error ? 'Authentication error: ' + session.error : 'No access token in session'
+        }, { status: 401 })
+      }
+
+      if (session?.error) {
+        console.log('Session has error:', session.error)
+        return NextResponse.json({
+          error: 'Authentication expired',
+          details: session.error
+        }, { status: 401 })
+      }
+
+      accessToken = session.accessToken
+    }
+
+    if (!accessToken) {
+      return NextResponse.json({ error: 'No access token provided' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -25,7 +60,7 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: session.accessToken as string
+      access_token: accessToken
     })
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
