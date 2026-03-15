@@ -1,6 +1,6 @@
 'use client'
 
-import { FolderOpen, Brain, Upload as UploadIcon, ArrowRight } from 'lucide-react'
+import { FolderOpen, Brain, Upload as UploadIcon } from 'lucide-react'
 import { useState } from 'react'
 
 const steps = [
@@ -14,8 +14,8 @@ const steps = [
       'Drag & drop interface with visual feedback',
       'Folder upload with preserved structure'
     ],
-    color: 'border-yt-blue',
-    iconColor: 'text-yt-blue'
+    color: 'border-slate',
+    iconColor: 'text-slate'
   },
   {
     icon: Brain,
@@ -27,8 +27,8 @@ const steps = [
       'Relevant tag suggestions for discoverability',
       'YouTube category recommendations'
     ],
-    color: 'border-yt-red',
-    iconColor: 'text-yt-red'
+    color: 'border-slate',
+    iconColor: 'text-slate'
   },
   {
     icon: UploadIcon,
@@ -40,8 +40,8 @@ const steps = [
       'Privacy controls (Public/Private/Unlisted)',
       'Real-time progress tracking'
     ],
-    color: 'border-yt-blue',
-    iconColor: 'text-yt-blue'
+    color: 'border-slate',
+    iconColor: 'text-slate'
   }
 ]
 
@@ -52,13 +52,12 @@ export default function HowItWorks() {
     <section className="section-padding bg-white">
       <div className="container-narrow">
         <div className="text-center space-y-8 mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yt-border text-yt-text-secondary caption">
-            <ArrowRight className="w-4 h-4" />
+          <div className="badge badge-subtle">
             <span>Simple 3-Step Workflow</span>
           </div>
 
           <h2 className="heading-lg">
-            How It <span className="text-gradient">Works</span>
+            How It <span className="text-yt-red">Works</span>
           </h2>
 
           <p className="body-lg max-w-2xl mx-auto">
@@ -67,8 +66,8 @@ export default function HowItWorks() {
         </div>
 
         {/* Steps visualization */}
-        <div className="relative mb-12">
-          <div className="absolute top-1/2 left-0 right-0 h-px bg-yt-border -translate-y-1/2"></div>
+        <div className="relative mb-16">
+          <div className="absolute top-[calc(50%+24px)] left-0 right-0 h-px bg-slate/10 z-0"></div>
 
           <div className="relative flex justify-between">
             {steps.map((step, index) => {
@@ -76,16 +75,25 @@ export default function HowItWorks() {
               const isActive = activeStep === index
 
               return (
-                <div key={index} className="flex flex-col items-center">
-                  <button
-                    onClick={() => setActiveStep(index)}
-                    className={`w-16 h-16 rounded-full border-2 ${step.color} bg-white flex items-center justify-center transition-all duration-300 ${isActive ? 'scale-110' : 'scale-100'}`}
-                  >
-                    <Icon className={`w-8 h-8 ${step.iconColor}`} />
-                  </button>
-                  <div className="mt-4 text-center">
-                    <div className="caption mb-1">Step {index + 1}</div>
-                    <h3 className="font-medium text-yt-text-primary">{step.title}</h3>
+                <div key={index} className="flex flex-col items-center z-10">
+                  <div className="relative">
+                    <div className={`absolute -inset-1 rounded-full ${isActive ? 'bg-yt-red/10' : ''} transition-all duration-300 z-10`}></div>
+                    <button
+                      onClick={() => setActiveStep(index)}
+                      className={`relative w-20 h-20 rounded-full border-2 ${isActive ? 'border-yt-red bg-white shadow-lg' : 'border-slate/30 bg-white'} flex items-center justify-center transition-all duration-300 ${isActive ? 'scale-110' : 'scale-100 hover:scale-105 hover:border-yt-red/50'} z-20`}
+                    >
+                      <div className={`absolute -inset-1 rounded-full ${isActive ? 'bg-yt-red/20' : 'bg-transparent'} transition-all duration-300`}></div>
+                      <Icon className={`w-10 h-10 ${isActive ? 'text-yt-red' : 'text-slate/70'} transition-colors duration-300`} />
+                      {isActive && (
+                        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-yt-red text-white flex items-center justify-center text-xs font-medium z-30">
+                          ✓
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                  <div className="mt-6 text-center">
+                    <div className="text-xs font-medium text-slate/70 mb-2">STEP {index + 1}</div>
+                    <h3 className={`text-lg font-semibold ${isActive ? 'text-charcoal' : 'text-slate'} transition-colors duration-300`}>{step.title}</h3>
                   </div>
                 </div>
               )
@@ -94,57 +102,80 @@ export default function HowItWorks() {
         </div>
 
         {/* Active step details */}
-        <div className="elegant-card">
-          {steps.map((step, index) => {
-            if (activeStep !== index) return null
-            const Icon = step.icon
+        <div className="relative group">
+          <div className="absolute -inset-0.5 bg-gradient-to-r from-yt-red/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="relative bg-white border border-slate/10 rounded-2xl p-8 shadow-sm">
+            {steps.map((step, index) => {
+              if (activeStep !== index) return null
+              const Icon = step.icon
 
-            return (
-              <div key={index} className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg ${step.iconColor === 'text-yt-blue' ? 'bg-yt-blue/10' : 'bg-yt-red/10'} flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${step.iconColor}`} />
-                  </div>
-                  <div>
-                    <h3 className="heading-md">{step.title}</h3>
-                    <p className="body-md">{step.description}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {step.details.map((detail, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className="w-6 h-6 rounded-full bg-yt-border flex items-center justify-center mt-0.5 flex-shrink-0">
-                        <div className="w-2 h-2 rounded-full bg-yt-blue"></div>
-                      </div>
-                      <span className="text-yt-text-secondary">{detail}</span>
+              return (
+                <div key={index} className="space-y-8">
+                  <div className="flex items-start gap-6">
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-yt-red/10 to-yt-red/5 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-8 h-8 text-yt-red" />
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yt-red/10 text-yt-red text-xs font-medium mb-3">
+                        Step {index + 1}
+                      </div>
+                      <h3 className="text-2xl font-semibold text-charcoal mb-3">{step.title}</h3>
+                      <p className="text-lg text-slate leading-relaxed">{step.description}</p>
+                    </div>
+                  </div>
 
-                <div className="pt-6 border-t border-yt-border">
-                  <div className="flex items-center justify-between caption">
-                    <span>Average time saved: <span className="font-medium text-yt-text-primary">85%</span></span>
-                    <span>Success rate: <span className="font-medium text-yt-text-primary">99.9%</span></span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {step.details.map((detail, idx) => (
+                      <div key={idx} className="flex items-start gap-4 p-4 rounded-lg bg-slate/5 hover:bg-slate/10 transition-colors duration-300">
+                        <div className="w-8 h-8 rounded-full bg-white border border-slate/20 flex items-center justify-center flex-shrink-0">
+                          <div className="w-2 h-2 rounded-full bg-yt-red"></div>
+                        </div>
+                        <span className="text-slate leading-relaxed">{detail}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-8 border-t border-slate/20">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                      <div className="text-center md:text-left">
+                        <div className="text-sm text-slate/70 mb-1">Average time saved</div>
+                        <div className="text-3xl font-light text-charcoal font-display">85%</div>
+                      </div>
+                      <div className="h-px md:h-8 md:w-px bg-slate/20"></div>
+                      <div className="text-center md:text-left">
+                        <div className="text-sm text-slate/70 mb-1">Success rate</div>
+                        <div className="text-3xl font-light text-charcoal font-display">99.9%</div>
+                      </div>
+                      <div className="h-px md:h-8 md:w-px bg-slate/20"></div>
+                      <div className="text-center md:text-left">
+                        <div className="text-sm text-slate/70 mb-1">Creators using this step</div>
+                        <div className="text-3xl font-light text-charcoal font-display">10K+</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
 
         {/* Step navigation */}
-        <div className="flex justify-center gap-4 mt-8">
+        <div className="flex justify-center gap-3 mt-12">
           {steps.map((step, index) => (
             <button
               key={index}
               onClick={() => setActiveStep(index)}
-              className={`px-4 py-2 rounded-md transition-all duration-300 ${activeStep === index
-                  ? 'bg-yt-blue text-white'
-                  : 'bg-yt-hover text-yt-text-primary hover:bg-yt-border'
+              className={`px-6 py-3 rounded-lg transition-all duration-300 flex items-center gap-2 ${activeStep === index
+                  ? 'bg-yt-red text-white shadow-md'
+                  : 'bg-white border border-slate/20 text-charcoal hover:border-yt-red/30 hover:shadow-sm'
                 }`}
             >
-              {step.title}
+              {activeStep === index && (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{step.title}</span>
             </button>
           ))}
         </div>

@@ -1,24 +1,29 @@
 import './globals.css'
-import { Bricolage_Grotesque, DM_Mono } from 'next/font/google'
+import { Inter, Playfair_Display } from 'next/font/google'
 import type { Metadata } from 'next'
 import Providers from './providers'
 
-const bricolage = Bricolage_Grotesque({ 
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-bricolage',
+  variable: '--font-inter',
   display: 'swap',
+  weight: ['300', '400'], // Light 300 for headlines, Regular 400 for body
 })
 
-const dmMono = DM_Mono({ 
-  weight: ['400', '500'],
+const playfair = Playfair_Display({
   subsets: ['latin'],
-  variable: '--font-dm-mono',
+  variable: '--font-playfair',
   display: 'swap',
+  weight: ['400'], // Regular 400 for accent/display
 })
 
 export const metadata: Metadata = {
   title: 'Universal YouTube Uploader',
   description: 'Upload any folder of videos to YouTube with smart playlists and descriptions',
+  icons: {
+    icon: '/favicon.ico',
+  },
+  manifest: '/manifest.json',
 }
 
 export default function RootLayout({
@@ -27,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${bricolage.variable} ${dmMono.variable}`}>
-      <body className="bg-yt-bg text-yt-text-primary font-sans antialiased selection:bg-youtube-neon selection:text-white">
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+      <body className="bg-pearl text-charcoal font-sans antialiased selection:bg-yt-red selection:text-white">
         <Providers session={undefined}>
           {children}
         </Providers>

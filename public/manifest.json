@@ -1,0 +1,16 @@
+{
+  "name": "Universal YouTube Uploader",
+  "short_name": "YT Uploader",
+  "description": "Upload any folder of videos to YouTube with smart playlists and descriptions",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ff0000",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "32x32",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -8,33 +8,35 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // YouTube colors - refined palette
-        'yt-red': '#FF0000',
-        'yt-red-subtle': '#FF3333', // Softer red
-        'yt-blue': '#3EA6FF',
-        'yt-blue-subtle': '#66B8FF', // Softer blue
-        'yt-bg': '#FFFFFF',
-        'yt-panel': '#FAFAFA',
-        'yt-border': '#E5E5E5',
-        'yt-text-primary': '#0F0F0F',
-        'yt-text-secondary': '#606060',
-        'yt-text-tertiary': '#909090',
-        'yt-hover': '#F5F5F5',
-        'yt-input': '#FFFFFF',
-        'youtube-neon': '#3EA6FF',
+        // Refined Luxury Palette - 5 colors total
+        'charcoal': '#1A1A1A', // Primary text, buttons
+        'slate': '#4A5568', // Secondary text, borders
+        'pearl': '#F8FAFC', // Background, panels
+        'yt-red': '#FF0000', // Single accent color (YouTube red)
+        'white': '#FFFFFF', // Pure white for contrast
 
-        // Elegant accents
-        'accent-primary': '#0F0F0F', // Dark for primary elements
-        'accent-secondary': '#3EA6FF', // YouTube blue
-        'accent-highlight': '#FF0000', // YouTube red for highlights
+        // Legacy aliases for backward compatibility during transition
+        'yt-bg': '#F8FAFC', // Alias for pearl
+        'yt-panel': '#FFFFFF', // Alias for white
+        'yt-border': '#E5E5E5', // Light border (between slate and pearl)
+        'yt-text-primary': '#1A1A1A', // Alias for charcoal
+        'yt-text-secondary': '#4A5568', // Alias for slate
+        'yt-text-tertiary': '#718096', // Lighter slate variant
+        'yt-hover': '#EDF2F7', // Light hover state
+        'yt-input': '#FFFFFF', // Alias for white
+        'youtube-neon': '#FF0000', // Alias for yt-red
+        'accent-primary': '#1A1A1A', // Alias for charcoal
+        'accent-secondary': '#FF0000', // Alias for yt-red
+        // Deprecated YouTube blue colors (kept for compatibility)
+        'yt-blue': '#3EA6FF',
+        'yt-blue-subtle': '#66B8FF',
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
         mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
-        display: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'], // Same as sans for elegance
+        display: ['Playfair Display', 'Georgia', 'Times New Roman', 'serif'],
       },
       animation: {
-        'upload': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fadeIn 0.5s ease-out',
         'slide-up': 'slideUp 0.6s ease-out',
         'scale-in': 'scaleIn 0.4s ease-out',

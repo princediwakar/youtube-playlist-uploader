@@ -1,20 +1,19 @@
 'use client'
 
 import { signIn } from 'next-auth/react'
-import { ArrowRight, CheckCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle } from 'lucide-react'
 
 export default function CTA() {
   return (
-    <section className="section-padding bg-yt-panel">
+    <section className="section-padding bg-white">
       <div className="container-narrow">
         <div className="text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yt-blue/10 text-yt-blue caption">
-            <Sparkles className="w-4 h-4" />
+          <div className="badge badge-accent">
             <span>Ready to Transform Your Workflow?</span>
           </div>
 
           <h2 className="heading-lg">
-            Start Uploading <span className="text-gradient">Smarter Today</span>
+            Start Uploading <span className="text-yt-red">Smarter Today</span>
           </h2>
 
           <p className="body-lg max-w-2xl mx-auto">
@@ -23,74 +22,78 @@ export default function CTA() {
           </p>
 
           {/* Primary CTA */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
             <button
               onClick={() => signIn('google')}
-              className="btn-accent flex items-center justify-center gap-3 px-8"
+              className="group relative px-10 py-4 bg-gradient-to-r from-yt-red to-red-500 text-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 flex items-center gap-3"
             >
-              <span>Start Uploading Free</span>
-              <ArrowRight className="w-5 h-5" />
+              <div className="absolute -inset-1 bg-gradient-to-r from-yt-red to-red-500 rounded-xl blur opacity-0 group-hover:opacity-70 transition-opacity duration-300"></div>
+              <span className="relative">Start Uploading Free</span>
+              <ArrowRight className="w-6 h-6 relative transform group-hover:translate-x-1 transition-transform" />
             </button>
 
             <a
               href="#features"
-              className="btn-secondary flex items-center justify-center gap-3 px-8"
+              className="group px-10 py-4 bg-white border-2 border-slate/20 text-charcoal rounded-xl font-semibold text-lg hover:border-yt-red/50 hover:shadow-lg transition-all duration-300 flex items-center gap-3"
             >
               <span>Learn More</span>
+              <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </a>
           </div>
 
           {/* Benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-2xl mx-auto pt-8">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-yt-blue/10 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-6 h-6 text-yt-blue" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto pt-12">
+            {[
+              {
+                icon: <CheckCircle className="w-8 h-8 text-yt-red" />,
+                title: 'Get Started in 60 Seconds',
+                description: 'Sign in with Google and upload your first video immediately.',
+                color: 'from-yt-red/10 to-yt-red/5'
+              },
+              {
+                icon: <div className="text-2xl font-bold text-yt-red">$0</div>,
+                title: 'Always Free',
+                description: 'No subscription fees, no hidden costs. All features available.',
+                color: 'from-yt-red/10 to-yt-red/5'
+              },
+              {
+                icon: <div className="text-xl font-bold text-yt-red">10K+</div>,
+                title: 'Trusted by Creators',
+                description: 'Join a community of 10K+ creators, educators, and brands.',
+                color: 'from-yt-red/10 to-yt-red/5'
+              }
+            ].map((benefit, index) => (
+              <div key={index} className="group text-center">
+                <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${benefit.color} flex items-center justify-center mx-auto mb-6 transition-transform duration-300 group-hover:scale-110`}>
+                  {benefit.icon}
+                </div>
+                <div className="text-lg font-semibold text-charcoal mb-3">{benefit.title}</div>
+                <p className="text-sm text-slate leading-relaxed">{benefit.description}</p>
+                <div className="mt-4 h-px w-12 mx-auto bg-slate/20 group-hover:bg-yt-red transition-colors duration-300"></div>
               </div>
-              <div className="font-medium text-yt-text-primary mb-2">Get Started in 60 Seconds</div>
-              <p className="caption">
-                Sign in with Google and upload your first video immediately.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-yt-red/10 flex items-center justify-center mx-auto mb-4">
-                <div className="text-lg font-bold text-yt-red">$0</div>
-              </div>
-              <div className="font-medium text-yt-text-primary mb-2">Always Free</div>
-              <p className="caption">
-                No subscription fees, no hidden costs. All features available.
-              </p>
-            </div>
-
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-yt-border flex items-center justify-center mx-auto mb-4">
-                <div className="text-sm font-medium text-yt-text-primary">10K+</div>
-              </div>
-              <div className="font-medium text-yt-text-primary mb-2">Trusted by Creators</div>
-              <p className="caption">
-                Join a community of 10K+ creators, educators, and brands.
-              </p>
-            </div>
+            ))}
           </div>
 
           {/* Final note */}
-          <div className="pt-12 border-t border-yt-border">
+          <div className="pt-12 border-t border-slate/20">
             <p className="caption max-w-lg mx-auto">
               Need help getting started?{' '}
-              <a href="mailto:support@example.com" className="text-yt-blue hover:underline">
+              <a href="mailto:support@example.com" className="text-yt-red hover:underline">
                 Contact support
               </a>{' '}
               or{' '}
-              <a href="/docs" className="text-yt-blue hover:underline">
+              <a href="/docs" className="text-yt-red hover:underline">
                 read our documentation
               </a>
               .
             </p>
             <p className="caption mt-4">
               By signing up, you agree to our{' '}
-              <a href="/terms" className="text-yt-text-primary hover:underline">Terms</a>{' '}
+              <a href="/terms" className="text-charcoal hover:underline">Terms</a>{' '}
               and{' '}
-              <a href="/privacy" className="text-yt-text-primary hover:underline">Privacy Policy</a>.
+              <a href="/privacy" className="text-charcoal hover:underline">Privacy Policy</a>.
             </p>
           </div>
         </div>

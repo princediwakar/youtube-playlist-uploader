@@ -9,135 +9,120 @@
   }
 
   body {
-    @apply bg-yt-bg text-yt-text-primary min-h-screen font-sans antialiased;
+    @apply bg-pearl text-charcoal min-h-screen font-sans antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom scrollbar */
+  /* Luxury scrollbar */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #F1F5F9;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d1d1d1;
+    background: #CBD5E0;
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a1a1a1;
+    background: #94A3B8;
   }
 
   /* Selection */
   ::selection {
-    @apply bg-yt-blue-subtle text-yt-text-primary;
+    @apply bg-yt-red text-white;
   }
 }
 
 @layer components {
-  /* Clean, elegant panels */
-  .panel {
-    @apply bg-yt-panel border border-yt-border rounded-lg p-6 transition-all duration-300;
-  }
-
-  .panel-hover {
-    @apply hover:border-yt-text-secondary hover:shadow-sm;
-  }
-
-  /* Drop zone */
-  .upload-dropzone {
-    @apply border-2 border-dashed border-yt-border rounded-lg p-8 text-center transition-all duration-300 bg-yt-bg;
-  }
-
-  .upload-dropzone.dragover {
-    @apply border-yt-blue bg-yt-blue/5;
-  }
-
-  /* Buttons */
-  .btn-primary {
-    @apply bg-accent-primary text-white font-medium text-sm py-3 px-6 rounded-md transition-all duration-200
-           hover:bg-yt-text-primary active:bg-yt-text-primary
+  /* Unified Button */
+  .btn {
+    @apply inline-flex items-center justify-center font-sans font-normal text-sm py-3 px-6 rounded-xl transition-all duration-200
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  .btn-primary {
+    @apply bg-gradient-to-r from-yt-red to-red-500 text-white shadow-lg hover:shadow-xl transition-all duration-300;
+  }
+
   .btn-secondary {
-    @apply bg-transparent border border-yt-border text-yt-text-primary text-sm py-3 px-6 rounded-md transition-all duration-200
-           hover:border-yt-text-secondary hover:bg-yt-hover;
+    @apply bg-transparent border border-slate text-charcoal hover:border-charcoal hover:bg-pearl;
   }
 
   .btn-accent {
-    @apply bg-yt-blue text-white font-medium text-sm py-3 px-6 rounded-md transition-all duration-200
-           hover:bg-yt-blue-subtle active:bg-yt-blue;
+    @apply bg-yt-red text-white hover:bg-red-500 active:bg-yt-red;
+  }
+
+  /* Unified Card */
+  .card {
+    @apply bg-white border border-slate/20 rounded-lg p-6 transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:border-yt-red hover:shadow-sm;
+  }
+
+  /* Panel */
+  .panel {
+    @apply bg-white border border-slate/10 rounded-lg p-6 transition-all duration-300;
+  }
+
+  .panel-hover {
+    @apply hover:border-slate/30 hover:shadow-xs;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-normal tracking-wide;
+  }
+
+  .badge-accent {
+    @apply bg-yt-red/10 text-yt-red;
+  }
+
+  .badge-subtle {
+    @apply bg-slate/10 text-slate;
   }
 
   /* Progress bar */
   .progress-bar {
-    @apply w-full bg-yt-border rounded-full h-1.5 overflow-hidden;
+    @apply w-full bg-slate/20 rounded-full h-1.5 overflow-hidden;
   }
 
   .progress-fill {
-    @apply h-full bg-yt-blue transition-all duration-300;
+    @apply h-full bg-yt-red transition-all duration-300;
   }
 
-  /* Landing page components */
-  .elegant-card {
-    @apply bg-white border border-yt-border rounded-lg p-6 transition-all duration-300;
-  }
-
-  .elegant-card-hover {
-    @apply hover:border-yt-blue hover:shadow-sm;
-  }
-
-  .highlight-card {
-    @apply bg-white border border-yt-border rounded-lg p-6 transition-all duration-300;
-    border-left: 4px solid theme('colors.yt-blue');
-  }
-
-  .accent-border {
-    border-left: 4px solid theme('colors.yt-blue');
-  }
-
-  .text-gradient {
-    @apply bg-gradient-to-r from-yt-blue to-yt-red bg-clip-text text-transparent;
-  }
-
-  .subtle-gradient {
-    background: linear-gradient(135deg,
-      theme('colors.yt-panel') 0%,
-      theme('colors.yt-bg') 100%
-    );
-  }
-
-  /* Typography helpers */
+  /* Typography helpers with refined hierarchy */
   .heading-xl {
-    @apply text-4xl md:text-5xl lg:text-6xl font-light tracking-tight;
+    @apply text-5xl md:text-6xl lg:text-7xl font-light tracking-tight font-display;
   }
 
   .heading-lg {
-    @apply text-3xl md:text-4xl font-light tracking-tight;
+    @apply text-4xl md:text-5xl font-light tracking-tight font-display;
   }
 
   .heading-md {
-    @apply text-2xl font-normal tracking-tight;
+    @apply text-2xl md:text-3xl font-normal tracking-tight font-sans;
   }
 
   .body-lg {
-    @apply text-lg leading-relaxed text-yt-text-secondary;
+    @apply text-lg leading-relaxed text-slate font-sans;
   }
 
   .body-md {
-    @apply text-base leading-relaxed text-yt-text-secondary;
+    @apply text-base leading-relaxed text-slate font-sans;
   }
 
   .caption {
-    @apply text-sm text-yt-text-tertiary;
+    @apply text-sm text-slate/70 font-sans;
   }
 
-  /* Layout helpers */
+  /* Layout helpers using 8px grid */
   .section-padding {
-    @apply py-12 md:py-20 lg:py-28;
+    @apply py-16 md:py-24 lg:py-32; /* 80px, 96px, 128px */
   }
 
   .container-narrow {
@@ -148,7 +133,7 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
-  /* Animation helpers */
+  /* Animation helpers - simplified */
   .animate-delay-100 {
     animation-delay: 100ms;
   }
@@ -159,9 +144,5 @@
 
   .animate-delay-300 {
     animation-delay: 300ms;
-  }
-
-  .animate-delay-400 {
-    animation-delay: 400ms;
   }
 }
