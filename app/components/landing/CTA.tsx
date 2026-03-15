@@ -17,8 +17,8 @@ export default function CTA() {
           </h2>
 
           <p className="body-lg max-w-2xl mx-auto">
-            Join thousands of creators who save hours every week with our AI-powered YouTube upload tool.
-            No credit card required. No limits. Just better content creation.
+            Join 10K+ creators who upload 95% faster with automated titles, batch processing, and smart playlists.
+            No credit card required—start scaling your YouTube content today.
           </p>
 
           {/* Primary CTA */}
@@ -33,7 +33,7 @@ export default function CTA() {
             </button>
 
             <a
-              href="#features"
+              href="#use-cases"
               className="group px-10 py-4 bg-white border-2 border-slate/20 text-charcoal rounded-xl font-semibold text-lg hover:border-yt-red/50 hover:shadow-lg transition-all duration-300 flex items-center gap-3"
             >
               <span>Learn More</span>
@@ -60,8 +60,8 @@ export default function CTA() {
               },
               {
                 icon: <div className="text-xl font-bold text-yt-red">10K+</div>,
-                title: 'Trusted by Creators',
-                description: 'Join a community of 10K+ creators, educators, and brands.',
+                title: 'Used by 10K+ Creators',
+                description: 'Join 10K+ creators, educators, and brands scaling their YouTube presence.',
                 color: 'from-yt-red/10 to-yt-red/5'
               }
             ].map((benefit, index) => (

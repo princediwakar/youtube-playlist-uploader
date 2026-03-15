@@ -11,10 +11,10 @@ export default function Hero() {
     setIsVisible(true)
   }, [])
 
-  const scrollToFeatures = () => {
-    const featuresSection = document.getElementById('features')
-    if (featuresSection) {
-      featuresSection.scrollIntoView({ behavior: 'smooth' })
+  const scrollToUseCases = () => {
+    const useCasesSection = document.getElementById('use-cases')
+    if (useCasesSection) {
+      useCasesSection.scrollIntoView({ behavior: 'smooth' })
     }
   }
 
@@ -35,8 +35,7 @@ export default function Hero() {
             </h1>
 
             <p className="body-lg max-w-2xl mx-auto">
-              Batch upload videos to YouTube with AI-powered optimization, intelligent playlists,
-              and workflow automation for creators, educators, and brands.
+              Upload dozens of videos at once with AI-generated titles, automated playlists, and smart publishing—cutting manual work by 95% for creators, educators, and brands.
             </p>
           </div>
 
@@ -52,7 +51,7 @@ export default function Hero() {
             </button>
 
             <button
-              onClick={scrollToFeatures}
+              onClick={scrollToUseCases}
               className="group px-10 py-4 bg-white border-2 border-slate/20 text-charcoal rounded-xl font-semibold text-lg hover:border-yt-red/50 hover:shadow-lg transition-all duration-300 flex items-center gap-3"
             >
               <span>See How It Works</span>
@@ -63,23 +62,20 @@ export default function Hero() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-12 animate-fade-in">
-            <div className="text-center">
-              <div className="heading-md text-charcoal">50+</div>
-              <div className="caption">Features</div>
-            </div>
-            <div className="text-center">
-              <div className="heading-md text-charcoal">100%</div>
-              <div className="caption">Free</div>
-            </div>
-            <div className="text-center">
-              <div className="heading-md text-charcoal">10K+</div>
-              <div className="caption">Creators</div>
-            </div>
-            <div className="text-center">
-              <div className="heading-md text-charcoal">90%</div>
-              <div className="caption">Time Saved</div>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 animate-fade-in">
+            {[
+              { value: '500+', label: 'Videos per batch', description: 'Maximum upload capacity' },
+              { value: '95%', label: 'Time saved', description: 'Compared to manual upload' },
+              { value: '99.9%', label: 'Success rate', description: 'Upload reliability' },
+              { value: 'Unlimited', label: 'Team members', description: 'Collaboration scale' }
+            ].map((stat, index) => (
+              <div key={index} className="text-center group">
+                <div className="text-4xl md:text-5xl font-light text-charcoal mb-2 font-display">{stat.value}</div>
+                <div className="text-sm font-medium text-charcoal mb-1">{stat.label}</div>
+                <div className="text-xs text-slate/70">{stat.description}</div>
+                <div className="mt-4 h-px w-12 mx-auto bg-slate/20 group-hover:bg-yt-red transition-colors duration-300"></div>
+              </div>
+            ))}
           </div>
 
           {/* Visual element */}
