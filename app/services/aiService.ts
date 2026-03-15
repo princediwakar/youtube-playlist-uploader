@@ -24,7 +24,6 @@ export async function analyzeContent(
   relativePath: string
 ): Promise<ContentAnalysis> {
   try {
-    console.log('🔑 DeepSeek API Key available:', !!process.env.DEEPSEEK_API_KEY)
     if (!process.env.DEEPSEEK_API_KEY) {
       throw new Error('DeepSeek API key not configured')
     }
