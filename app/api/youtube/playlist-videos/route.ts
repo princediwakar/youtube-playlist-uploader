@@ -5,45 +5,10 @@ import { google } from 'googleapis'
 
 export async function GET(request: NextRequest) {
   try {
-    // Check for Authorization header first (for script access)
-    const authHeader = request.headers.get('Authorization')
-    let accessToken: string | null = null
+    const session = await getServerSession(authOptions)
 
-    if (authHeader?.startsWith('Bearer ')) {
-      accessToken = authHeader.substring(7)
-      console.log('Using access token from Authorization header')
-    } else {
-      // Fall back to session-based authentication
-      const session = await getServerSession(authOptions)
-
-      console.log('Playlist videos session check:', {
-        sessionExists: !!session,
-        accessTokenExists: !!session?.accessToken,
-        accessTokenLength: session?.accessToken?.length,
-        sessionError: session?.error
-      })
-
-      if (!session?.accessToken) {
-        console.log('No access token available')
-        return NextResponse.json({
-          error: 'Not authenticated',
-          details: session?.error ? 'Authentication error: ' + session.error : 'No access token in session'
-        }, { status: 401 })
-      }
-
-      if (session?.error) {
-        console.log('Session has error:', session.error)
-        return NextResponse.json({
-          error: 'Authentication expired',
-          details: session.error
-        }, { status: 401 })
-      }
-
-      accessToken = session.accessToken
-    }
-
-    if (!accessToken) {
-      return NextResponse.json({ error: 'No access token provided' }, { status: 401 })
+    if (!session?.accessToken) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -60,7 +25,7 @@ export async function GET(request: NextRequest) {
     )
 
     oauth2Client.setCredentials({
-      access_token: accessToken
+      access_token: session.accessToken as string
     })
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
@@ -85,32 +50,24 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Get playlist videos error:', error)
-    
+
     let errorMessage = 'Failed to get playlist videos'
-    let errorDetails = 'Unknown error'
-    
+
     if (error instanceof Error) {
-      errorDetails = error.message
-      
       // Handle specific YouTube API errors
       if (error.message.includes('Invalid Credentials') || error.message.includes('unauthorized')) {
         errorMessage = 'Authentication failed'
-        errorDetails = 'Your YouTube access token has expired. Please sign out and sign in again.'
       } else if (error.message.includes('quotaExceeded')) {
         errorMessage = 'Quota exceeded'
-        errorDetails = 'YouTube API quota exceeded. Please try again later.'
       } else if (error.message.includes('forbidden')) {
         errorMessage = 'Permission denied'
-        errorDetails = 'Insufficient permissions to access this playlist. Please check your YouTube account permissions.'
       } else if (error.message.includes('notFound')) {
         errorMessage = 'Playlist not found'
-        errorDetails = 'The specified playlist could not be found or you do not have access to it.'
       }
     }
-    
-    return NextResponse.json({ 
-      error: errorMessage, 
-      details: errorDetails 
+
+    return NextResponse.json({
+      error: errorMessage
     }, { status: 500 })
   }
 }

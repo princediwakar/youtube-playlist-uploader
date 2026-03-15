@@ -24,14 +24,6 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, account, user }) {
-      console.log('JWT callback called', {
-        tokenKeys: Object.keys(token),
-        accountExists: !!account,
-        accountAccessToken: !!account?.access_token,
-        accountRefreshToken: !!account?.refresh_token,
-        tokenAccessTokenExpires: token.accessTokenExpires,
-        currentTime: Date.now()
-      })
       // Persist the OAuth access_token and refresh_token to the token right after signin
       if (account) {
         token.accessToken = account.access_token
@@ -48,11 +40,6 @@ export const authOptions: NextAuthOptions = {
       return refreshAccessToken(token)
     },
     async session({ session, token }) {
-      console.log('Session callback called', {
-        tokenAccessToken: !!token.accessToken,
-        tokenError: token.error,
-        sessionUser: session.user
-      })
       // Send properties to the client
       session.accessToken = token.accessToken as string
       session.error = token.error as string
@@ -66,7 +53,6 @@ export const authOptions: NextAuthOptions = {
 }
 
 async function refreshAccessToken(token: any) {
-  console.log('Refreshing access token, has refreshToken:', !!token.refreshToken)
   try {
     const url = 'https://oauth2.googleapis.com/token'
 
@@ -84,10 +70,8 @@ async function refreshAccessToken(token: any) {
     })
 
     const refreshedTokens = await response.json()
-    console.log('Token refresh response ok:', response.ok, 'has access_token:', !!refreshedTokens.access_token)
 
     if (!response.ok) {
-      console.log('Token refresh failed:', refreshedTokens)
       throw refreshedTokens
     }
 
@@ -98,7 +82,6 @@ async function refreshAccessToken(token: any) {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     }
   } catch (error) {
-    console.log(error)
 
     return {
       ...token,

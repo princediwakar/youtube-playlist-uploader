@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Upload, FolderOpen } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
@@ -21,15 +21,6 @@ interface UploadScreenProps {
 }
 
 export default function UploadScreen({ session }: UploadScreenProps) {
-  useEffect(() => {
-    console.log('UploadScreen session debug:', {
-      hasSession: !!session,
-      hasAccessToken: !!session?.accessToken,
-      accessTokenLength: session?.accessToken?.length,
-      sessionError: session?.error,
-      user: session?.user?.name
-    })
-  }, [session])
 
   const { videos, setVideos, addVideos, replaceVideos, removeVideo, updateVideoStatus, resetVideoStatuses } = useFileHandling()
   const {
