@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
-import { google } from 'googleapis'
+import { YouTubeApiService } from '@/app/services/youtubeApi'
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,37 +32,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Playlist title is required' }, { status: 400 })
     }
 
-    console.log('Creating OAuth2 client...')
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
-    )
-
-    console.log('Setting credentials with access token...')
-    oauth2Client.setCredentials({
-      access_token: session.accessToken as string
-    })
-
-    console.log('Creating YouTube client...')
-    const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
+    console.log('Creating YouTube API client...')
+    const youtubeApi = new YouTubeApiService(session.accessToken as string)
 
     console.log('Attempting to create playlist...')
     // Create playlist
-    const response = await youtube.playlists.insert({
-      part: ['snippet', 'status'],
-      requestBody: {
-        snippet: {
-          title: title,
-          description: description || `Playlist created with Universal YouTube Uploader\n\n🎯 Organized collection of videos for optimal learning experience.\n\n#Playlist #Education #Learning`
-        },
-        status: {
-          privacyStatus: privacyStatus || 'unlisted'
-        }
-      }
-    })
-
-    const playlistId = response.data.id
+    const playlistId = await youtubeApi.createPlaylist(
+      title,
+      description || `Playlist created with Universal YouTube Uploader\n\n🎯 Organized collection of videos for optimal learning experience.\n\n#Playlist #Education #Learning`,
+      (privacyStatus || 'unlisted') as 'private' | 'public' | 'unlisted'
+    )
 
     return NextResponse.json({
       success: true,
@@ -114,35 +93,21 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
-    )
-
-    oauth2Client.setCredentials({
-      access_token: session.accessToken as string
-    })
-
-    const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
+    const youtubeApi = new YouTubeApiService(session.accessToken as string)
 
     // Get user's playlists
-    const response = await youtube.playlists.list({
-      part: ['snippet', 'contentDetails'],
-      mine: true,
-      maxResults: 25
-    })
+    const playlists = await youtubeApi.getPlaylists(25)
 
     console.log('Playlist API response:', {
-      totalResults: response.data.pageInfo?.totalResults,
-      resultsPerPage: response.data.pageInfo?.resultsPerPage,
-      itemsCount: response.data.items?.length,
-      items: response.data.items?.map(p => ({ id: p.id, title: p.snippet?.title }))
+      totalResults: playlists.length,
+      resultsPerPage: 25,
+      itemsCount: playlists.length,
+      items: playlists.map(p => ({ id: p.id, title: p.snippet?.title }))
     })
 
     return NextResponse.json({
       success: true,
-      playlists: response.data.items
+      playlists: playlists
     })
 
   } catch (error) {
