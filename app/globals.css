@@ -10,69 +10,158 @@
 
   body {
     @apply bg-yt-bg text-yt-text-primary min-h-screen font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d1d1d1;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-yt-blue-subtle text-yt-text-primary;
   }
 }
 
 @layer components {
-  /* Clean, rounded panels like YouTube Studio cards */
-  .upload-card, .panel {
-    @apply bg-yt-panel border border-yt-border rounded-xl p-6 transition-all duration-300 shadow-sm;
+  /* Clean, elegant panels */
+  .panel {
+    @apply bg-yt-panel border border-yt-border rounded-lg p-6 transition-all duration-300;
   }
-  
+
   .panel-hover {
-    @apply hover:border-yt-text-secondary hover:shadow-md;
+    @apply hover:border-yt-text-secondary hover:shadow-sm;
   }
-  
-  /* Drop target area: clean, standard dashed border */
+
+  /* Drop zone */
   .upload-dropzone {
-    @apply border-2 border-dashed border-yt-border rounded-xl p-8 text-center transition-all duration-300 relative overflow-hidden bg-yt-bg hover:bg-yt-hover hover:border-yt-text-secondary;
+    @apply border-2 border-dashed border-yt-border rounded-lg p-8 text-center transition-all duration-300 bg-yt-bg;
   }
-  
+
   .upload-dropzone.dragover {
-    @apply border-yt-blue bg-[#e3f2fd] scale-[0.99];
+    @apply border-yt-blue bg-yt-blue/5;
   }
 
-
-  
-  /* Buttons: YouTube Studio rounded corners, solid colors */
+  /* Buttons */
   .btn-primary {
-    @apply bg-yt-blue text-[#0f0f0f] font-medium text-sm py-2 px-4 rounded-full transition-all duration-200 
-           hover:bg-[#65b8ff] active:bg-[#268cdb]
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-yt-blue;
+    @apply bg-accent-primary text-white font-medium text-sm py-3 px-6 rounded-md transition-all duration-200
+           hover:bg-yt-text-primary active:bg-yt-text-primary
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
-  
+
   .btn-secondary {
-    @apply bg-transparent text-yt-text-primary text-sm py-2 px-4 rounded-full transition-all duration-200
-           hover:bg-yt-hover active:bg-[#4d4d4d];
+    @apply bg-transparent border border-yt-border text-yt-text-primary text-sm py-3 px-6 rounded-md transition-all duration-200
+           hover:border-yt-text-secondary hover:bg-yt-hover;
   }
-  
-  /* Simple solid progress bar */
+
+  .btn-accent {
+    @apply bg-yt-blue text-white font-medium text-sm py-3 px-6 rounded-md transition-all duration-200
+           hover:bg-yt-blue-subtle active:bg-yt-blue;
+  }
+
+  /* Progress bar */
   .progress-bar {
-    @apply w-full bg-yt-bg border border-yt-border rounded-full h-1.5 overflow-hidden;
+    @apply w-full bg-yt-border rounded-full h-1.5 overflow-hidden;
   }
-  
+
   .progress-fill {
     @apply h-full bg-yt-blue transition-all duration-300;
   }
-}
 
-@keyframes moveStripes {
-  0% { background-position: 0 0; }
-  100% { background-position: 20px 20px; }
-}
+  /* Landing page components */
+  .elegant-card {
+    @apply bg-white border border-yt-border rounded-lg p-6 transition-all duration-300;
+  }
 
-/* Custom scrollbar matching YouTube light mode */
-::-webkit-scrollbar {
-  width: 16px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background-color: #CCCCCC;
-  border-radius: 8px;
-  border: 4px solid #FFFFFF;
-}
-::-webkit-scrollbar-thumb:hover {
-  background-color: #AAAAAA;
+  .elegant-card-hover {
+    @apply hover:border-yt-blue hover:shadow-sm;
+  }
+
+  .highlight-card {
+    @apply bg-white border border-yt-border rounded-lg p-6 transition-all duration-300;
+    border-left: 4px solid theme('colors.yt-blue');
+  }
+
+  .accent-border {
+    border-left: 4px solid theme('colors.yt-blue');
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-yt-blue to-yt-red bg-clip-text text-transparent;
+  }
+
+  .subtle-gradient {
+    background: linear-gradient(135deg,
+      theme('colors.yt-panel') 0%,
+      theme('colors.yt-bg') 100%
+    );
+  }
+
+  /* Typography helpers */
+  .heading-xl {
+    @apply text-4xl md:text-5xl lg:text-6xl font-light tracking-tight;
+  }
+
+  .heading-lg {
+    @apply text-3xl md:text-4xl font-light tracking-tight;
+  }
+
+  .heading-md {
+    @apply text-2xl font-normal tracking-tight;
+  }
+
+  .body-lg {
+    @apply text-lg leading-relaxed text-yt-text-secondary;
+  }
+
+  .body-md {
+    @apply text-base leading-relaxed text-yt-text-secondary;
+  }
+
+  .caption {
+    @apply text-sm text-yt-text-tertiary;
+  }
+
+  /* Layout helpers */
+  .section-padding {
+    @apply py-12 md:py-20 lg:py-28;
+  }
+
+  .container-narrow {
+    @apply max-w-4xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .container-wide {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Animation helpers */
+  .animate-delay-100 {
+    animation-delay: 100ms;
+  }
+
+  .animate-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animate-delay-300 {
+    animation-delay: 300ms;
+  }
+
+  .animate-delay-400 {
+    animation-delay: 400ms;
+  }
 }

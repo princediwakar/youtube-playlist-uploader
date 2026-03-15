@@ -8,35 +8,50 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // YouTube colors - refined palette
         'yt-red': '#FF0000',
+        'yt-red-subtle': '#FF3333', // Softer red
         'yt-blue': '#3EA6FF',
+        'yt-blue-subtle': '#66B8FF', // Softer blue
         'yt-bg': '#FFFFFF',
-        'yt-panel': '#F9F9F9',
-        'yt-border': '#E0E0E0',
+        'yt-panel': '#FAFAFA',
+        'yt-border': '#E5E5E5',
         'yt-text-primary': '#0F0F0F',
         'yt-text-secondary': '#606060',
-        'yt-hover': '#F0F0F0',
+        'yt-text-tertiary': '#909090',
+        'yt-hover': '#F5F5F5',
         'yt-input': '#FFFFFF',
         'youtube-neon': '#3EA6FF',
+
+        // Elegant accents
+        'accent-primary': '#0F0F0F', // Dark for primary elements
+        'accent-secondary': '#3EA6FF', // YouTube blue
+        'accent-highlight': '#FF0000', // YouTube red for highlights
       },
       fontFamily: {
-        sans: ['Roboto', 'Arial', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        mono: ['SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        display: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'], // Same as sans for elegance
       },
       animation: {
         'upload': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'scanline': 'scanline 2s linear infinite',
-        'pulse-glow': 'pulseGlow 2s ease-in-out infinite alternate',
+        'fade-in': 'fadeIn 0.5s ease-out',
+        'slide-up': 'slideUp 0.6s ease-out',
+        'scale-in': 'scaleIn 0.4s ease-out',
       },
       keyframes: {
-        scanline: {
-          '0%': { transform: 'translateY(-100%)' },
-          '100%': { transform: 'translateY(100vh)' }
+        fadeIn: {
+          '0%': { opacity: 0 },
+          '100%': { opacity: 1 }
         },
-        pulseGlow: {
-          '0%': { boxShadow: '0 0 0 0 rgba(255, 42, 42, 0.4)' },
-          '100%': { boxShadow: '0 0 20px 5px rgba(255, 42, 42, 0)' }
-        }
+        slideUp: {
+          '0%': { transform: 'translateY(20px)', opacity: 0 },
+          '100%': { transform: 'translateY(0)', opacity: 1 }
+        },
+        scaleIn: {
+          '0%': { transform: 'scale(0.95)', opacity: 0 },
+          '100%': { transform: 'scale(1)', opacity: 1 }
+        },
       }
     },
   },
