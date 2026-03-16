@@ -2,10 +2,11 @@
 
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { VideoFile, UploadSettings } from '@/app/types/video'
+import { MediaFile, UploadSettings, isVideoFile, isAudioFile } from '@/app/types/video'
+import { generateAudioFrame } from '@/app/utils/audioHelpers'
 
 export interface UploadQueueItem {
-  video: VideoFile
+  video: MediaFile
   metadata: {
     title: string
     description: string
@@ -23,9 +24,22 @@ export function useVideoUpload() {
   const [currentUpload, setCurrentUpload] = useState<string | null>(null)
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
 
+  // Helper function to convert data URL to File
+  const dataURLtoFile = (dataUrl: string, filename: string): File => {
+    const arr = dataUrl.split(',')
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
+    const bstr = atob(arr[1])
+    let n = bstr.length
+    const u8arr = new Uint8Array(n)
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n)
+    }
+    return new File([u8arr], filename, { type: mime })
+  }
+
   // Upload a single video
   const uploadVideo = useCallback(async (
-    video: VideoFile,
+    video: MediaFile,
     metadata: {
       title: string
       description: string
@@ -49,7 +63,8 @@ export function useVideoUpload() {
       formData.append('title', metadata.title)
       formData.append('description', metadata.description)
       formData.append('tags', JSON.stringify(metadata.tags))
-      formData.append('category', metadata.category)
+      // Use audio category for audio files, generic category for video files
+      formData.append('category', isAudioFile(video) ? uploadSettings.audioCategory : metadata.category)
       if (playlistId) {
         formData.append('playlistId', playlistId)
         if (position !== undefined) {
@@ -59,9 +74,56 @@ export function useVideoUpload() {
       formData.append('privacyStatus', uploadSettings.privacyStatus)
       formData.append('madeForKids', uploadSettings.madeForKids.toString())
       formData.append('uploadMode', uploadSettings.uploadMode)
-      formData.append('isShort', (video.isShort || false).toString())
+      formData.append('isShort', (isVideoFile(video) ? (video.isShort || false) : false).toString())
       formData.append('duration', (video.duration || 0).toString())
-      formData.append('aspectRatio', (video.aspectRatio || 1.78).toString())
+      formData.append('aspectRatio', (isVideoFile(video) ? (video.aspectRatio || 1.78) : 1.78).toString())
+
+      // For audio files, generate thumbnail based on settings
+      if (isAudioFile(video)) {
+        let thumbnailDataUrl: string | undefined
+
+        try {
+          // Generate enhanced audio frame if setting enabled and waveform available
+          if (uploadSettings.generateAudioFrames && video.waveform && video.waveform.length > 0) {
+            // Generate enhanced audio frame with title, description, and metadata
+            thumbnailDataUrl = generateAudioFrame(
+              video.waveform,
+              metadata.title,
+              metadata.description,
+              {
+                width: 1280,
+                height: 720,
+                backgroundColor: '#0f0f0f',
+                waveformColor: '#ff0000',
+                textColor: '#ffffff',
+                showMetadata: true,
+                metadata: {
+                  artist: video.artist,
+                  album: video.album,
+                  duration: video.duration,
+                  format: video.audioFormat,
+                }
+              }
+            )
+            console.log('Generated enhanced audio frame with waveform')
+          } else if (video.audioThumbnail) {
+            // Use existing audioThumbnail (basic waveform)
+            thumbnailDataUrl = video.audioThumbnail
+            console.log('Using existing audio thumbnail')
+          }
+
+          if (thumbnailDataUrl) {
+            const thumbnailFile = dataURLtoFile(thumbnailDataUrl, 'audio-thumbnail.jpg')
+            formData.append('thumbnail', thumbnailFile)
+            console.log('Added audio thumbnail to upload form')
+          } else {
+            console.log('No audio thumbnail available, backend will generate simple one')
+          }
+        } catch (thumbnailError) {
+          console.warn('Failed to generate or add audio thumbnail:', thumbnailError)
+          // Continue without thumbnail, backend will generate one
+        }
+      }
 
       const response = await fetch('/api/youtube/upload', {
         method: 'POST',
@@ -88,8 +150,8 @@ export function useVideoUpload() {
     uploadSettings: UploadSettings,
     playlistId?: string,
     onProgress?: (completed: number, total: number) => void,
-    onVideoComplete?: (video: VideoFile, result: any) => void,
-    onVideoError?: (video: VideoFile, error: Error) => void
+    onVideoComplete?: (video: MediaFile, result: any) => void,
+    onVideoError?: (video: MediaFile, error: Error) => void
   ) => {
     if (!session?.accessToken) {
       throw new Error('Not authenticated')

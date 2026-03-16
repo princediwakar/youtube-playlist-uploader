@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['googleapis'],
+  serverExternalPackages: ['googleapis', 'fluent-ffmpeg', '@ffmpeg-installer/ffmpeg'],
   env: {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   },

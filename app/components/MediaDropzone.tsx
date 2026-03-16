@@ -3,14 +3,13 @@
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, FolderOpen } from 'lucide-react'
-import { VideoFile } from '@/app/types/video'
 
-interface VideoDropzoneProps {
+interface MediaDropzoneProps {
   onDrop: (files: File[]) => void
   disabled?: boolean
 }
 
-export function VideoDropzone({ onDrop, disabled = false }: VideoDropzoneProps) {
+export function MediaDropzone({ onDrop, disabled = false }: MediaDropzoneProps) {
   const handleDrop = useCallback((acceptedFiles: File[]) => {
     onDrop(acceptedFiles)
   }, [onDrop])
@@ -18,7 +17,8 @@ export function VideoDropzone({ onDrop, disabled = false }: VideoDropzoneProps) 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
     accept: {
-      'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv']
+      'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv'],
+      'audio/*': ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.opus', '.aiff', '.alac']
     },
     maxSize: 10 * 1024 * 1024 * 1024, // 10GB max file size
     multiple: true,
@@ -45,20 +45,20 @@ export function VideoDropzone({ onDrop, disabled = false }: VideoDropzoneProps) 
         </div>
         <div>
           <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
-            {isDragActive ? 'Drop your videos here' : 'Drag & drop your videos here'}
+            {isDragActive ? 'Drop your media files here' : 'Drag & drop your media files here'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Upload MP4, MOV, AVI, MKV, WEBM, FLV, or WMV files up to 10GB each.
+            Upload video (MP4, MOV, AVI, MKV, WEBM, FLV, WMV) or audio (MP3, WAV, M4A, FLAC, OGG, AAC) files up to 10GB each.
           </p>
           <button
             type="button"
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={disabled}
           >
-            Select Video Files
+            Select Media Files
           </button>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-            You can upload multiple videos at once. Each video will be analyzed before upload.
+            You can upload multiple media files at once. Each file will be analyzed before upload.
           </p>
         </div>
       </div>

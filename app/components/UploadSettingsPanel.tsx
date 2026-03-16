@@ -2,10 +2,10 @@
 
 import { ChevronDown, Check, Database, Sparkles } from 'lucide-react'
 import { PlaylistSelector } from './PlaylistSelector'
-import { UploadSettings, PlaylistItem, VideoFile } from '@/app/types/video'
+import { UploadSettings, PlaylistItem, MediaFile, isVideoFile, isAudioFile } from '@/app/types/video'
 
 interface UploadSettingsPanelProps {
-  videos: VideoFile[]
+  videos: MediaFile[]
   uploadSettings: UploadSettings
   onSettingsChange: (settings: Partial<UploadSettings>) => void
   availablePlaylists: PlaylistItem[]
@@ -48,6 +48,9 @@ export function UploadSettingsPanel({
     return null
   }
 
+  const audioFiles = videos.filter(v => isAudioFile(v))
+  const hasAudioFiles = audioFiles.length > 0
+
   return (
     <div className="panel">
       <div className="flex justify-between items-center border-b border-yt-border pb-3 mb-6">
@@ -58,9 +61,9 @@ export function UploadSettingsPanel({
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-sm font-medium text-yt-text-primary">Upload Mode</h4>
-          {videos.filter(v => v.isShort).length > 0 && (
+          {videos.filter(v => isVideoFile(v) && v.isShort).length > 0 && (
             <span className="text-xs bg-yt-bg text-yt-text-secondary px-2 py-1 rounded-full border border-yt-border">
-              {videos.filter(v => v.isShort).length} SHORTS DETECTED
+              {videos.filter(v => isVideoFile(v) && v.isShort).length} SHORTS DETECTED
             </span>
           )}
         </div>
@@ -102,7 +105,7 @@ export function UploadSettingsPanel({
               </span>
             </div>
             <span className="text-xs text-yt-text-secondary ml-7 block mt-1">Standalone videos
-              {videos.filter(v => v.isShort).length > 0 && <span className="bg-[#F0F0F0] px-1 py-0.5 rounded ml-2 text-[10px]">Shorts Recommended</span>}
+              {videos.filter(v => isVideoFile(v) && v.isShort).length > 0 && <span className="bg-[#F0F0F0] px-1 py-0.5 rounded ml-2 text-[10px]">Shorts Recommended</span>}
             </span>
           </label>
         </div>
@@ -268,6 +271,59 @@ export function UploadSettingsPanel({
                 <span className="text-xs text-yt-text-secondary">Add prev/next links to description</span>
               </div>
             </div>
+
+            {/* Audio Settings (only shown when audio files are present) */}
+            {hasAudioFiles && (
+              <>
+                <div className="flex items-start space-x-3 group">
+                  <label className="relative flex cursor-pointer mt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={uploadSettings.generateAudioFrames}
+                      onChange={(e) => onSettingsChange({
+                        generateAudioFrames: e.target.checked
+                      })}
+                      className="sr-only"
+                    />
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.generateAudioFrames ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
+                      {uploadSettings.generateAudioFrames && <Check size={14} className="text-yt-text-primary" />}
+                    </div>
+                  </label>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-yt-text-primary mb-1">Generate Audio Frames</span>
+                    <span className="text-xs text-yt-text-secondary">Create video thumbnails for audio files</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3 group">
+                  <div className="flex flex-col flex-1">
+                    <span className="text-sm font-medium text-yt-text-primary mb-1">Audio Category</span>
+                    <div className="relative">
+                      <select
+                        value={uploadSettings.audioCategory}
+                        onChange={(e) => onSettingsChange({ audioCategory: e.target.value })}
+                        className="w-full px-3 py-2 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer text-sm"
+                      >
+                        <option value="10">10: Music</option>
+                        <option value="26">26: HowTo & Style</option>
+                        <option value="27">27: Education</option>
+                        <option value="22">22: People & Blogs</option>
+                        <option value="24">24: Entertainment</option>
+                        <option value="25">25: News & Politics</option>
+                        <option value="19">19: Travel & Events</option>
+                        <option value="17">17: Sports</option>
+                        <option value="15">15: Pets & Animals</option>
+                        <option value="28">28: Sci-Tech</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-yt-text-secondary">
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+                    <span className="text-xs text-yt-text-secondary mt-1">Default category for audio files</span>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Cache Management */}
             <div className="md:col-span-2 pt-6 border-t border-yt-border flex flex-col sm:flex-row items-start sm:items-center justify-between">

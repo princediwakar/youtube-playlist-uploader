@@ -1,15 +1,16 @@
 'use client'
 
-import { FileVideo, X, CheckCircle } from 'lucide-react'
-import { VideoFile } from '@/app/types/video'
+import { FileVideo, X, CheckCircle, Music } from 'lucide-react'
+import { MediaFile, isVideoFile, isAudioFile } from '@/app/types/video'
+import { CompactWaveformVisualizer } from './WaveformVisualizer'
 
-interface VideoListProps {
-  videos: VideoFile[]
+interface MediaListProps {
+  videos: MediaFile[]
   maxVideos: number
   onRemoveVideo: (index: number) => void
 }
 
-export function VideoList({ videos, maxVideos, onRemoveVideo }: VideoListProps) {
+export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) {
   // Calculate pending videos
   const pendingVideos = videos.filter(v => v.status === 'pending');
 
@@ -51,8 +52,24 @@ export function VideoList({ videos, maxVideos, onRemoveVideo }: VideoListProps) 
 
             {/* Thumbnail */}
             <div className="relative w-16 h-9 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-3">
-              {video.thumbnail ? (
+              {isVideoFile(video) && video.thumbnail ? (
                 <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+              ) : isAudioFile(video) ? (
+                video.waveform && video.waveform.length > 0 ? (
+                  <CompactWaveformVisualizer
+                    waveform={video.waveform}
+                    width={64}
+                    height={36}
+                    color="#ff0000"
+                    backgroundColor="#0f0f0f"
+                  />
+                ) : video.audioThumbnail ? (
+                  <img src={video.audioThumbnail} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-yt-text-secondary">
+                    <Music size={12} />
+                  </div>
+                )
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-yt-text-secondary">
                   <FileVideo size={12} />

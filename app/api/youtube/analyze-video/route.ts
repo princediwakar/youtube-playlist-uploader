@@ -55,21 +55,11 @@ export async function POST(request: NextRequest) {
       })
       
     } catch (aiError) {
-      console.error('AI analysis failed, using fallback:', aiError)
-      
-      // Fallback to basic metadata
-      const finalTitle = generateTitle(currentFileName, titleFormat, customTitlePrefix, customTitleSuffix)
-      const description = generateFallbackDescription(currentFileName, folderName, relativePath)
-      const tags = generateBasicTags(currentFileName, folderName)
-      const category = detectCategoryFromContent(folderName, allFileNames, relativePath)
-
+      console.error('AI analysis failed:', aiError)
       return NextResponse.json({
-        success: true,
-        title: finalTitle,
-        description: description,
-        tags: tags,
-        category: category
-      })
+        error: 'AI analysis failed',
+        details: aiError instanceof Error ? aiError.message : 'Unknown error'
+      }, { status: 500 })
     }
 
   } catch (error) {
@@ -143,97 +133,5 @@ function generateTitle(filename: string, format: string, prefix: string, suffix:
   return title || 'Untitled Video'
 }
 
-function generateFallbackDescription(fileName: string, folderName: string, relativePath: string): string {
-  const cleanName = fileName.replace(/\.[^/.]+$/, '').replace(/^\d+[\.\-_\s]*/, '')
-  
-  let description = `🎯 ${cleanName}\n\n`
-  description += `📚 Quality educational content designed to provide valuable insights and learning opportunities.\n\n`
-  
-  if (folderName) {
-    description += `📂 COLLECTION: ${folderName}\n\n`
-  }
-  
-  description += `💡 Like and subscribe for more educational content!\n`
-  description += `💬 Share your thoughts and questions in the comments below.\n\n`
-  description += `#education #learning #content #tutorial #guide`
-  
-  return description
-}
 
-function generateBasicTags(fileName: string, folderName: string): string[] {
-  const text = `${fileName} ${folderName}`.toLowerCase()
-  const baseTags = ['education', 'learning', 'tutorial', 'guide', 'content']
-  
-  const specificTags = []
-  if (text.includes('business')) specificTags.push('business', 'professional')
-  if (text.includes('tech')) specificTags.push('technology', 'programming')
-  if (text.includes('course')) specificTags.push('course', 'training')
-  if (text.includes('beginner')) specificTags.push('beginner', 'basics')
-  if (text.includes('advanced')) specificTags.push('advanced', 'expert')
-  
-  return [...baseTags, ...specificTags].slice(0, 10)
-}
 
-function detectCategoryFromContent(folderName: string, allFileNames: string[], relativePath: string): string {
-  const allText = `${folderName} ${allFileNames.join(' ')} ${relativePath}`.toLowerCase()
-  
-  const categoryScores: { [key: string]: number } = {
-    '27': 0, // Education
-    '28': 0, // Science & Technology
-    '26': 0, // Howto & Style
-    '22': 0, // People & Blogs
-    '24': 0, // Entertainment
-    '25': 0, // News & Politics
-    '19': 0, // Travel & Events
-    '17': 0, // Sports
-    '15': 0, // Pets & Animals
-    '10': 0, // Music
-  }
-  
-  // Education indicators (Category 27)
-  const educationKeywords = [
-    'course', 'lesson', 'tutorial', 'learn', 'education', 'training', 'class', 
-    'lecture', 'study', 'teach', 'instruction', 'academy', 'school', 'university',
-    'guide', 'howto', 'beginner', 'advanced', 'basics', 'fundamentals'
-  ]
-  educationKeywords.forEach(keyword => {
-    if (allText.includes(keyword)) categoryScores['27'] += 2
-  })
-  
-  // Science & Technology indicators (Category 28)
-  const techKeywords = [
-    'programming', 'coding', 'software', 'development', 'tech', 'technology',
-    'computer', 'algorithm', 'data', 'science', 'engineering', 'ai', 'ml',
-    'javascript', 'python', 'react', 'node', 'web', 'app', 'api', 'database'
-  ]
-  techKeywords.forEach(keyword => {
-    if (allText.includes(keyword)) categoryScores['28'] += 3
-  })
-  
-  // Business/Professional indicators (People & Blogs - Category 22)
-  const businessKeywords = [
-    'business', 'entrepreneur', 'marketing', 'strategy', 'professional',
-    'career', 'leadership', 'management', 'finance', 'sales', 'startup',
-    'growth', 'success', 'productivity', 'networking'
-  ]
-  businessKeywords.forEach(keyword => {
-    if (allText.includes(keyword)) categoryScores['22'] += 2
-  })
-  
-  // Special case: If it contains retention/engagement/analytics, likely business content
-  if (allText.includes('retention') || allText.includes('engagement') || allText.includes('analytics')) {
-    categoryScores['22'] += 3 // People & Blogs for business content
-  }
-  
-  // If no clear category detected, default to Education
-  const maxScore = Math.max(...Object.values(categoryScores))
-  if (maxScore === 0) {
-    return '27' // Default to Education
-  }
-  
-  // Return the category with the highest score
-  const bestCategory = Object.entries(categoryScores)
-    .find(([, score]) => score === maxScore)?.[0] || '27'
-  
-  return bestCategory
-}

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     console.error('Playlist analysis error:', error)
     return NextResponse.json({ 
       error: 'Failed to analyze playlist',
-      description: 'Educational content collection covering key concepts and strategies.'
+      description: ''
     }, { status: 500 })
   }
 }

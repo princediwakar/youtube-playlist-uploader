@@ -1,6 +1,6 @@
 'use client'
 
-import { Video, Users, Briefcase, Upload, FileText, Layers, Folder, Zap, Globe, Lock, Settings } from 'lucide-react'
+import { Video, Users, Briefcase, Upload, FileText, Layers, Folder, Zap, Globe, Lock, Settings, Headphones, Mic, Activity } from 'lucide-react'
 
 const useCases = [
   {
@@ -77,6 +77,31 @@ const useCases = [
     ],
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-600/10'
+  },
+  {
+    persona: 'Podcaster & Audio Creator',
+    icon: Headphones,
+    description: 'For musicians, podcasters, and audio course creators sharing on YouTube.',
+    metrics: 'Upload full seasons as video',
+    features: [
+      {
+        icon: Activity,
+        title: 'Animated waveforms',
+        description: 'Automatically generate stunning video waveforms synced directly to your audio tracks.'
+      },
+      {
+        icon: Mic,
+        title: 'Podcast AI metadata',
+        description: 'Smart AI generates episode show notes, timestamps, and comprehensive guest summaries.'
+      },
+      {
+        icon: Upload,
+        title: 'Direct audio to YouTube',
+        description: 'Upload MP3, WAV, and M4A directly. We handle the complex video conversion process.'
+      }
+    ],
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-600/10'
   }
 ]
 
@@ -98,7 +123,7 @@ export default function UseCases() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {useCases.map((useCase, index) => {
             const PersonaIcon = useCase.icon
             return (

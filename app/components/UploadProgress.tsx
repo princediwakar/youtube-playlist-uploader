@@ -1,11 +1,11 @@
 'use client'
 
 import { FileVideo, Upload, CheckCircle, Database } from 'lucide-react'
-import { VideoList } from './VideoList'
-import { VideoFile, UploadSettings } from '@/app/types/video'
+import { MediaList } from './MediaList'
+import { MediaFile, UploadSettings } from '@/app/types/video'
 
 interface UploadProgressProps {
-  videos: VideoFile[]
+  videos: MediaFile[]
   uploadSettings: UploadSettings
   loadingExistingVideos: boolean
   existingPlaylistVideos: any[]
@@ -189,7 +189,7 @@ export function UploadProgress({
           </div>
         )}
 
-        <VideoList
+        <MediaList
           videos={videos}
           maxVideos={uploadSettings.maxVideos}
           onRemoveVideo={onRemoveVideo}

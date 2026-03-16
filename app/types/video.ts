@@ -1,19 +1,8 @@
-export interface VideoFile {
-  file: File
-  name: string
-  size: string
-  path: string
-  relativePath: string
-  folder: string
-  status: 'pending' | 'uploading' | 'completed' | 'error'
-  progress: number
-  videoId?: string
-  error?: string
-  thumbnail?: string
-  isShort?: boolean
-  duration?: number
-  aspectRatio?: number
-}
+// Re-export types from media module for backward compatibility
+export * from './media'
+
+// Keep VideoFile as an alias for backward compatibility
+// Note: VideoFile is now defined in media.ts as part of discriminated union
 
 export interface UploadSettings {
   playlistName: string
@@ -33,6 +22,9 @@ export interface UploadSettings {
   // Playlist selection
   useExistingPlaylist: boolean
   selectedPlaylistId: string
+  // Audio-specific settings
+  audioCategory: string
+  generateAudioFrames: boolean
 }
 
 export interface PlaylistItem {

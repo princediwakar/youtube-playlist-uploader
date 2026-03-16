@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     // Create playlist
     const playlistId = await youtubeApi.createPlaylist(
       title,
-      description || `Playlist created with Universal YouTube Uploader\n\n🎯 Organized collection of videos for optimal learning experience.\n\n#Playlist #Education #Learning`,
+      description || '',
       (privacyStatus || 'unlisted') as 'private' | 'public' | 'unlisted'
     )
 

@@ -4,9 +4,9 @@ import { useState, useCallback } from 'react'
 import { Upload, FolderOpen } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
-import { UploadSettings } from '@/app/types/video'
-import { extractPlaylistName, analyzeVideo, checkForDuplicateVideos, calculateInsertionPositions } from '@/app/utils/videoHelpers'
-import { VideoList } from '@/app/components/VideoList'
+import { UploadSettings, isVideoFile } from '@/app/types/video'
+import { extractPlaylistName, checkForDuplicateVideos, calculateInsertionPositions } from '@/app/utils/videoHelpers'
+import { MediaList } from '@/app/components/MediaList'
 import { PlaylistSelector } from '@/app/components/PlaylistSelector'
 import { UploadSettingsPanel } from '@/app/components/UploadSettingsPanel'
 import { UploadProgress } from '@/app/components/UploadProgress'
@@ -70,7 +70,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     addPlaylistNavigation: true,
     // Playlist selection
     useExistingPlaylist: false,
-    selectedPlaylistId: ''
+    selectedPlaylistId: '',
+    // Audio-specific settings
+    audioCategory: '10', // Music
+    generateAudioFrames: true
   })
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -91,7 +94,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     // Auto-detect if we should suggest individual upload mode for Shorts
     // Wait for video analysis to complete (isShort will be set by replaceVideos)
     setTimeout(() => {
-      const shortVideos = videos.filter(v => v.isShort).length
+      const shortVideos = videos.filter(v => isVideoFile(v) && v.isShort).length
       if (shortVideos > 0 && shortVideos === videos.length) {
         // All videos are Shorts, suggest individual upload
         setUploadSettings(prev => ({ ...prev, uploadMode: 'individual' }))
@@ -99,7 +102,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     }, 2000) // Give time for video analysis to complete
   }, [uploadSettings.playlistName, uploadSettings.category, replaceVideos, videos])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'video/*': [] } });
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'video/*': [], 'audio/*': [] } });
 
   // Handle folder selection
   const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -313,10 +316,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                       </span>
                     </div>
                     <p className="text-sm text-yt-text-secondary mb-6">
-                      Drag and drop multiple video files or click to select them individually
+                      Drag and drop multiple media files (video or audio) or click to select them individually
                     </p>
                     <div className="mt-4 text-xs text-yt-text-secondary">
-                      MP4, MOV, AVI, MKV, WEBM, FLV, WMV
+                      Video: MP4, MOV, AVI, MKV, WEBM, FLV, WMV • Audio: MP3, WAV, M4A, FLAC, OGG, AAC
                     </div>
                   </div>
                 )}
@@ -355,7 +358,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                     </span>
                   </div>
                   <p className="text-sm text-yt-text-secondary mb-6">
-                    Select a folder containing videos to automatically create a YouTube playlist. Videos are ordered by filename.
+                    Select a folder containing media files (video or audio) to automatically create a YouTube playlist. Files are ordered by filename.
                   </p>
                   <div className="mt-4 text-xs text-yt-text-secondary">
                     Perfect for courses, tutorials, or video series
@@ -369,7 +372,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                   multiple
                   onChange={handleFolderSelect}
                   className="hidden"
-                  accept="video/*,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v"
+                  accept="video/*,audio/*,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v,.mp3,.wav,.m4a,.flac,.ogg,.aac,.wma,.opus,.aiff,.alac"
                   id="folder-upload-input"
                 />
               </div>
@@ -381,7 +384,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               <div className="p-4 bg-yt-bg rounded-lg border border-yt-border flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-yt-text-primary mb-1">
-                    Ready to upload: {videos.length} video{videos.length !== 1 ? 's' : ''}
+                    Ready to upload: {videos.length} media file{videos.length !== 1 ? 's' : ''}
                   </p>
                   <p className="text-xs text-yt-text-secondary">
                     FROM {Array.from(new Set(videos.map(v => v.folder))).length} FOLDER{Array.from(new Set(videos.map(v => v.folder))).length !== 1 ? 'S' : ''}

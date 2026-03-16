@@ -6,12 +6,9 @@ import { analyzeContent } from '../../../../app/services/aiService'
 import path from 'path'
 import {
   generateTitle,
-  generateFallbackDescription,
-  generateBasicTags,
-  detectCategoryFromContent,
-  cleanAIGeneratedTitle,
-  generateShortsDescription
+  cleanAIGeneratedTitle
 } from '../../../../app/utils/videoHelpers'
+import { convertAudioToVideo, convertAudioToWaveformVideo, generateSimpleAudioThumbnail } from '../../../../app/utils/ffmpegWrapper'
 
 // Disable body parser to handle file uploads
 export const dynamic = 'force-dynamic'
@@ -39,6 +36,7 @@ export async function POST(request: NextRequest) {
     const videoFile = formData.get('video') as File
     const originalFilename = videoFile.name
     const sanitizedFilename = path.basename(originalFilename)
+    const mediaType = videoFile.type.startsWith('audio/') ? 'audio' : 'video'
     const title = formData.get('title') as string
     const contentType = formData.get('contentType') as string || 'auto'
     const privacyStatus = formData.get('privacyStatus') as string || 'unlisted'
@@ -49,6 +47,7 @@ export async function POST(request: NextRequest) {
     const folderStructure = formData.get('folderStructure') as string || ''
     const allFileNames = formData.get('allFileNames') as string || '[]'
     const folderName = formData.get('folderName') as string || ''
+    const thumbnailFile = formData.get('thumbnail') as File | null
     
     // Advanced settings
     const madeForKids = formData.get('madeForKids') === 'true'
@@ -100,57 +99,40 @@ export async function POST(request: NextRequest) {
     let tags: string[]
     let finalCategory = category
     
-    if (useAiAnalysis) {
-      console.log('🤖 Starting AI analysis for:', sanitizedFilename)
-      try {
-        const aiAnalysis = await analyzeContent(
-          folderName,
-          allFiles,
-          sanitizedFilename,
-          relativePath
-        )
-        
-        console.log('✅ AI analysis completed:', {
-          title: aiAnalysis.videoTitle,
-          descriptionLength: aiAnalysis.videoDescription.length,
-          tagsCount: aiAnalysis.tags.length,
-          category: aiAnalysis.category
-        })
-        
-        // Use AI-generated title based on format preference
-        if (titleFormat === 'original') {
-          finalTitle = cleanAIGeneratedTitle(aiAnalysis.videoTitle, sanitizedFilename)
-        } else {
-          finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
-        }
-        
-        description = aiAnalysis.videoDescription
-        tags = aiAnalysis.tags
-        finalCategory = aiAnalysis.category
-        
-      } catch (aiError) {
-        console.error('AI analysis failed, using fallback:', aiError)
-        // Fallback to basic metadata if AI fails
+    console.log('🤖 Starting AI analysis for:', sanitizedFilename)
+    try {
+      const aiAnalysis = await analyzeContent(
+        folderName,
+        allFiles,
+        sanitizedFilename,
+        relativePath
+      )
+
+      console.log('✅ AI analysis completed:', {
+        title: aiAnalysis.videoTitle,
+        descriptionLength: aiAnalysis.videoDescription.length,
+        tagsCount: aiAnalysis.tags.length,
+        category: aiAnalysis.category
+      })
+
+      // Use AI-generated title based on format preference
+      if (titleFormat === 'original') {
+        finalTitle = cleanAIGeneratedTitle(aiAnalysis.videoTitle, sanitizedFilename)
+      } else {
         finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
-        description = generateFallbackDescription(sanitizedFilename, folderName, relativePath)
-        tags = generateBasicTags(sanitizedFilename, folderName)
-        finalCategory = detectCategoryFromContent(folderName, allFiles, relativePath)
       }
-    } else {
-      // No AI analysis - use basic metadata
-      finalTitle = generateTitle(sanitizedFilename, titleFormat, customTitlePrefix, customTitleSuffix)
-      description = generateFallbackDescription(sanitizedFilename, folderName, relativePath)
-      tags = generateBasicTags(sanitizedFilename, folderName)
-      
-      // Quick category detection (non-AI) if still default
-      if (category === '27') {
-        finalCategory = detectCategoryFromContent(folderName, allFiles, relativePath)
-      }
+
+      description = aiAnalysis.videoDescription
+      tags = aiAnalysis.tags
+      finalCategory = aiAnalysis.category
+
+    } catch (aiError) {
+      console.error('AI analysis failed:', aiError)
+      throw new Error(`AI analysis failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`)
     }
     
     // Optimize for YouTube Shorts
     if (isShort && duration <= 60 && aspectRatio <= 1.0) {
-      description = generateShortsDescription(sanitizedFilename, description)
       tags = [...tags, 'shorts', 'short', 'vertical', 'mobile'].slice(0, 10)
       // Use Entertainment category for Shorts unless user explicitly chose a different category
       if (finalCategory === '27') {
@@ -163,12 +145,77 @@ export async function POST(request: NextRequest) {
       descriptionLength: description.length,
       tagsCount: tags.length,
       category: finalCategory,
-      aiAnalysisUsed: useAiAnalysis
+      aiAnalysisUsed: useAiAnalysis,
+      mediaType
     })
 
+    let uploadBuffer: Buffer
+    let uploadFilename = sanitizedFilename
+
+    // Handle audio files: convert to animated waveform video
+    if (mediaType === 'audio') {
+      console.log('Processing audio file, generating animated waveform video...')
+
+      const audioBuffer = Buffer.from(await videoFile.arrayBuffer())
+
+      try {
+        // Primary: Generate animated waveform video using showwaves filter
+        uploadBuffer = await convertAudioToWaveformVideo(
+          audioBuffer,
+          videoFile.name,
+          {
+            width: 1280,
+            height: 720,
+            waveformColor: '0xff0000',     // YouTube red
+            backgroundColor: '0x0f0f0f',   // Near-black
+            waveMode: 'cline',             // Centered line — smooth and professional
+            fps: 25
+          }
+        )
+        uploadFilename = uploadFilename.replace(/\.[^/.]+$/, '') + '.mp4'
+        console.log('Animated waveform video generated successfully:', uploadFilename)
+      } catch (waveformError) {
+        console.warn('Waveform video generation failed, falling back to static thumbnail:', waveformError)
+
+        // Fallback: Use the old static-image approach
+        let thumbnailBuffer: Buffer
+        if (thumbnailFile) {
+          thumbnailBuffer = Buffer.from(await thumbnailFile.arrayBuffer())
+        } else {
+          thumbnailBuffer = await generateSimpleAudioThumbnail(
+            finalTitle,
+            undefined,
+            duration || undefined,
+            1280,
+            720
+          )
+        }
+
+        try {
+          uploadBuffer = await convertAudioToVideo(
+            audioBuffer,
+            thumbnailBuffer,
+            videoFile.name,
+            'thumbnail.jpg',
+            {
+              duration: duration || 10,
+              title: finalTitle
+            }
+          )
+          uploadFilename = uploadFilename.replace(/\.[^/.]+$/, '') + '.mp4'
+          console.log('Fallback static video generated:', uploadFilename)
+        } catch (conversionError) {
+          console.error('Audio to video conversion failed:', conversionError)
+          throw new Error(`Failed to convert audio to video: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`)
+        }
+      }
+    } else {
+      // Video file, use as-is
+      uploadBuffer = Buffer.from(await videoFile.arrayBuffer())
+    }
+
     // Convert File to buffer for upload
-    const bytes = await videoFile.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    const buffer = uploadBuffer
 
     try {
       console.log('Preparing YouTube upload with:', {
@@ -183,7 +230,7 @@ export async function POST(request: NextRequest) {
       // Upload video to YouTube using service
       const uploadResponse = await youtubeApi.uploadVideo(
         buffer,
-        sanitizedFilename,
+        uploadFilename,
         {
           title: finalTitle,
           description: description,

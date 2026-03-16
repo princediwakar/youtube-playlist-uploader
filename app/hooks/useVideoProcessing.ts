@@ -2,8 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { VideoFile, UploadSettings } from '@/app/types/video'
-import { generateTitle, generateFallbackDescription, generateBasicTags, getBasename } from '@/app/utils/videoHelpers'
+import { MediaFile, UploadSettings } from '@/app/types/video'
+import { generateTitle, getBasename } from '@/app/utils/videoHelpers'
 
 export function useVideoProcessing() {
   const { data: session } = useSession()
@@ -26,7 +26,7 @@ export function useVideoProcessing() {
   })
 
   // Generate playlist description
-  const generatePlaylistDescription = useCallback(async (videos: VideoFile[], uploadSettings: UploadSettings) => {
+  const generatePlaylistDescription = useCallback(async (videos: MediaFile[], uploadSettings: UploadSettings) => {
     const folderName = videos.length > 0 ? videos[0].folder : ''
     const fileNames = videos.map(v => getBasename(v.file.name))
 
@@ -56,23 +56,11 @@ export function useVideoProcessing() {
     }
 
     // Fallback to basic description
-    const cleanFolderName = folderName.replace(/^\d+[\.\-_\s]*/, '').trim()
-    return `🎯 ${cleanFolderName || 'Complete Course'}
-
-Collection of ${videos.length} educational videos covering key concepts and strategies.
-
-📚 WHAT'S INCLUDED:
-${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/, '').replace(/\.[^/.]+$/, '')}`).join('\n')}${videos.length > 5 ? `\n...and ${videos.length - 5} more videos` : ''}
-
-💡 PERFECT FOR: Professionals and students looking to expand their knowledge
-
-🔥 WATCH IN ORDER for the best learning experience
-
-#Education #Learning #Professional`
+    return ''
   }, [])
 
   // Suggest category based on video content
-  const suggestCategory = useCallback(async (videos: VideoFile[]) => {
+  const suggestCategory = useCallback(async (videos: MediaFile[]) => {
     try {
       setAiProcessing(prev => ({ ...prev, categoryAnalysis: true }))
 
@@ -107,11 +95,11 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
 
   // Pre-process videos (generate metadata, AI analysis, etc.)
   const preProcessVideos = useCallback(async (
-    videos: VideoFile[],
+    videos: MediaFile[],
     uploadSettings: UploadSettings,
-    onVideoProcessed?: (video: VideoFile, metadata: any) => void
+    onVideoProcessed?: (video: MediaFile, metadata: any) => void
   ): Promise<Array<{
-    video: VideoFile
+    video: MediaFile
     metadata: {
       title: string
       description: string
@@ -130,7 +118,7 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
     })
 
     const processedVideos: Array<{
-      video: VideoFile
+      video: MediaFile
       metadata: {
         title: string
         description: string
@@ -179,9 +167,12 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
               category: string
             }
 
+            // Common data for both AI and non-AI
+            const allFileNames = videos.map(v => getBasename(v.file.name))
+            const folderName = videos.length > 0 ? videos[0].folder : ''
+
             if (uploadSettings.useAiAnalysis) {
               // AI analysis for this video
-              const allFileNames = videos.map(v => getBasename(v.file.name))
               setAiProcessing(prev => ({
                 ...prev,
                 videoAnalysis: true,
@@ -192,7 +183,7 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  folderName: videos.length > 0 ? videos[0].folder : '',
+                  folderName,
                   allFileNames,
                   currentFileName: getBasename(video.file.name),
                   relativePath: video.relativePath,
@@ -208,7 +199,7 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
                   title: aiResult.title,
                   description: aiResult.description,
                   tags: aiResult.tags,
-                  category: aiResult.category
+                  category: video.mediaType === 'audio' ? uploadSettings.audioCategory : aiResult.category
                 }
               } else {
                 throw new Error('AI analysis failed')
@@ -220,12 +211,15 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
                 currentVideoAnalysis: null
               }))
             } else {
-              // Basic metadata generation
+              // AI analysis disabled - provide empty description, empty tags, and user-selected category
+              const tags = []
+              let finalCategory = video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
+
               metadata = {
                 title: generateTitle(getBasename(video.file.name), uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
-                description: generateFallbackDescription(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : '', video.relativePath),
-                tags: generateBasicTags(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : ''),
-                category: uploadSettings.category
+                description: '',
+                tags,
+                category: finalCategory
               }
             }
 
@@ -240,9 +234,9 @@ ${videos.slice(0, 5).map((v, i) => `${i + 1}. ${v.name.replace(/^\d+[\.\-_\s]*/,
             // Return fallback metadata
             const fallbackMetadata = {
               title: generateTitle(getBasename(video.file.name), uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
-              description: generateFallbackDescription(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : '', video.relativePath),
-              tags: generateBasicTags(getBasename(video.file.name), videos.length > 0 ? videos[0].folder : ''),
-              category: uploadSettings.category
+              description: '',
+              tags: [],
+              category: video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
             }
 
             if (onVideoProcessed) {

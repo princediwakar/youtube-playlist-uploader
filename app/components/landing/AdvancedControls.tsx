@@ -1,6 +1,6 @@
 'use client'
 
-import { Layers, Shield, Upload, Settings, Check, Lock, Globe, Users, Calendar, Play, FolderPlus, RefreshCw } from 'lucide-react'
+import { Layers, Shield, Upload, Settings, Check, Lock, Globe, Users, Calendar, Play, FolderPlus, RefreshCw, Mic, Activity, Image as ImageIcon, Music } from 'lucide-react'
 import { useState } from 'react'
 
 const controls = [
@@ -230,6 +230,87 @@ const controls = [
     ],
     color: 'text-emerald-600',
     bgColor: 'bg-emerald-600/10'
+  },
+  {
+    id: 'audio',
+    title: 'Audio Studio',
+    icon: Mic,
+    description: 'Transform audio into stunning YouTube videos with waveforms and metadata.',
+    features: [
+      {
+        title: 'Animated Waveforms',
+        description: 'Auto-generate beautiful waveform animations perfectly synced to your audio tracks.',
+        icon: Activity,
+        visual: (
+          <div className="p-4 bg-slate/5 rounded-lg border border-slate/10 overflow-hidden relative">
+            <div className="absolute inset-0 flex items-center justify-center opacity-10">
+              <Activity className="w-24 h-24 text-purple-600" />
+            </div>
+            <div className="relative flex items-end justify-center gap-1 h-12">
+              {[40, 70, 45, 90, 60, 80, 50, 65, 30, 85, 45, 75, 55, 35].map((height, i) => (
+                <div 
+                  key={i} 
+                  className="w-1.5 bg-gradient-to-t from-purple-600 to-purple-400 rounded-full animate-pulse"
+                  style={{ height: `${height}%`, animationDelay: `${i * 0.1}s` }}
+                ></div>
+              ))}
+            </div>
+          </div>
+        )
+      },
+      {
+        title: 'Audio to Video Conversion',
+        description: 'Upload MP3 or WAV directly. We handle the complex FFmpeg container conversion.',
+        icon: ImageIcon,
+        visual: (
+          <div className="flex items-center gap-4 p-4 bg-white border border-slate/20 rounded-lg">
+            <div className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs">
+                MP3
+              </div>
+              <span className="text-[10px] text-slate font-medium">AUDIO</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="h-0.5 w-8 bg-slate/20 relative">
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 border-t-2 border-r-2 border-slate/40 transform rotate-45"></div>
+              </div>
+              <Activity className="w-4 h-4 text-purple-600 my-1 animate-spin-slow" />
+            </div>
+            <div className="flex-1 flex flex-col items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-yt-red/10 flex items-center justify-center text-yt-red font-bold text-xs relative overflow-hidden">
+                MP4
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-yt-red"></div>
+              </div>
+              <span className="text-[10px] text-slate font-medium">VIDEO</span>
+            </div>
+          </div>
+        )
+      },
+      {
+        title: 'Smart Podcast Metadata',
+        description: 'AI detects audio content and generates episode notes, timestamps, and categories.',
+        icon: Music,
+        visual: (
+          <div className="space-y-2">
+            <div className="flex items-start gap-3 p-3 bg-gradient-to-r from-purple-600/5 to-transparent rounded-lg border border-purple-600/20">
+              <div className="mt-0.5">
+                <Music className="w-4 h-4 text-purple-600" />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-charcoal">🎙️ Episode 42: The Future of AI</div>
+                <div className="text-[10px] text-slate mt-1 line-clamp-2">In this episode, we dive deep into the world of artificial intelligence. We discuss machine learning, neural networks, and how these technologies are shaping our future.</div>
+                <div className="flex gap-1 mt-2">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate/10 text-slate">#Podcast</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate/10 text-slate">#Tech</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    ],
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-600/10'
   }
 ]
 
