@@ -1,5 +1,7 @@
+// app/utils/ffmpegWrapper.ts
 import ffmpeg from 'fluent-ffmpeg'
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import os from 'os'
 import fs from 'fs'
 import path from 'path'
 import { promisify } from 'util'
@@ -142,6 +144,8 @@ export interface WaveformVideoOptions {
   textColor?: string          // Hex color for text (e.g., '0xffffff')
   fontSize?: number           // Base font size
   showWaveformOnly?: boolean  // If true, only show waveform without metadata
+  waveformWidthRatio?: number  // Ratio of waveform width to video width (default 0.6)
+  waveformHeightRatio?: number // Ratio of waveform height to video height (default 0.3)
 }
 
 /**
@@ -156,37 +160,60 @@ export async function convertAudioToWaveformVideo(
   const {
     width = 1280,
     height = 720,
-    waveformColor = '0xff0000',    // YouTube red
-    backgroundColor = '0x0f0f0f',  // Near-black
-    waveMode = 'cline',            // Centered line — smooth and professional
-    fps = 25,
+    waveformColor = '0xff3333',    
+    backgroundColor = '0x0f0f0f',  
+    waveMode = 'cline',            
+    fps = 30, 
     videoCodec = 'libx264',
     audioCodec = 'aac',
     outputFormat = 'mp4',
-    // Metadata options with defaults
     showMetadata = true,
     metadata = {},
-    textColor = '0xffffff',
-    fontSize = 24,
-    showWaveformOnly = false
+    textColor = '0xffffff', // Hex consistency
+    fontSize = 48 
   } = options
 
   const tempDir = '/tmp'
   const audioTempPath = path.join(tempDir, `waveform-audio-${Date.now()}-${audioFileName.replace(/[^a-zA-Z0-9.-]/g, '_')}`)
   const outputTempPath = path.join(tempDir, `waveform-output-${Date.now()}.${outputFormat}`)
+  
+  // STRATEGIC FIX: Environmental Parity for Fonts
+  // Always prefer a bundled font in your repo. Fall back to OS defaults ONLY if missing.
+  let fontPath = process.env.FONT_PATH || path.join(process.cwd(), 'public', 'fonts', 'Roboto-Bold.ttf');
+  
+  if (!fs.existsSync(fontPath)) {
+    console.warn(`[WARNING] Bundled font not found at ${fontPath}. Falling back to system fonts.`);
+    const platform = os.platform();
+    if (platform === 'darwin') fontPath = '/System/Library/Fonts/Helvetica.ttc';
+    else if (platform === 'win32') fontPath = 'C:\\\\Windows\\\\Fonts\\\\arial.ttf';
+    else fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+  }
 
   try {
     await writeFile(audioTempPath, audioBuffer)
 
     const videoBuffer = await new Promise<Buffer>((resolve, reject) => {
-      // Build the filter_complex string:
-      // 1. showwaves generates the waveform video from the audio
-      // 2. We split the audio so we can use it for both visualization and the output audio track
+      const waveformWidth = Math.floor(width * 0.7); 
+      const waveformHeight = Math.floor(height * 0.25);
+      const waveformX = Math.floor((width - waveformWidth) / 2);
+      const waveformY = Math.floor(height * 0.55); 
+
+      const titleText = metadata?.title || audioFileName.replace(/\.[^/.]+$/, '');
+      
+      // VITAL: Colons MUST be escaped in FFmpeg drawtext to prevent filter chain corruption.
+      const escapedTitle = titleText
+        .replace(/\\/g, '\\\\\\\\')
+        .replace(/'/g, "\\\\?'")
+        .replace(/:/g, '\\\\:');
+
       const filterComplex = [
-        `[0:a]showwaves=s=${width}x${height}:mode=${waveMode}:rate=${fps}:colors=${waveformColor}:scale=sqrt[waves]`,
+        `[0:a]showwaves=s=${waveformWidth}x${waveformHeight}:mode=${waveMode}:rate=${fps}:colors=${waveformColor}:scale=cbrt[waves]`,
         `color=c=${backgroundColor}:s=${width}x${height}:r=${fps}[bg]`,
-        `[bg][waves]overlay=shortest=1:format=auto[v]`
-      ].join(';')
+        `[bg][waves]overlay=x=${waveformX}:y=${waveformY}[with_wave]`,
+        ...(showMetadata 
+            ? [`[with_wave]drawtext=text='${escapedTitle}':fontfile='${fontPath}':fontcolor=${textColor}:fontsize=${fontSize}:shadowcolor=black:shadowx=2:shadowy=2:x=(w-text_w)/2:y=(h/3)[v]`] 
+            : [`[with_wave]copy[v]`])
+      ].join(';');
 
       const command = ffmpeg()
         .input(audioTempPath)
@@ -194,35 +221,30 @@ export async function convertAudioToWaveformVideo(
         .outputOptions([
           '-map', '[v]',
           '-map', '0:a',
-          `-c:v`, videoCodec,
-          `-c:a`, audioCodec,
-          '-b:a', '192k',
-          '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart',  // Allow YouTube to start playing sooner
-          '-preset', 'fast'
+          `-c:v ${videoCodec}`,
+          `-crf 18`,             
+          `-preset fast`,        
+          `-c:a ${audioCodec}`,
+          `-b:a 320k`,           
+          `-ar 48000`,           
+          '-pix_fmt yuv420p',
+          '-shortest',           
+          '-movflags +faststart' 
         ])
         .output(outputTempPath)
-        .on('start', (commandLine) => {
-          console.log('FFmpeg waveform generation started:', commandLine)
+        .on('start', (cmd) => {
+          console.log(`[FFmpeg] Started: ${cmd}`);
         })
         .on('progress', (progress) => {
+          // Restored progress logging to prevent blind spots
           if (progress.percent) {
-            console.log(`Waveform generation progress: ${Math.round(progress.percent)}%`)
+             console.log(`[FFmpeg] Processing: ${progress.percent.toFixed(2)}% done`);
           }
         })
-        .on('end', async () => {
-          try {
-            const buffer = await readFile(outputTempPath)
-            resolve(buffer)
-          } catch (readError) {
-            reject(readError)
-          }
-        })
-        .on('error', (err) => {
-          reject(new Error(`FFmpeg waveform generation failed: ${err.message}`))
-        })
+        .on('end', async () => resolve(await readFile(outputTempPath)))
+        .on('error', (err) => reject(new Error(`FFmpeg failed: ${err.message}`)));
 
-      command.run()
+      command.run();
     })
 
     return videoBuffer
@@ -300,7 +322,7 @@ export async function checkFfmpegAvailability(): Promise<boolean> {
 
 /**
  * Generate a simple thumbnail for audio files (fallback if no thumbnail provided)
- * This creates a basic waveform visualization using Node.js canvas alternatives
+ * Creates a PPM (Portable Pixmap) image that FFmpeg can read
  */
 export async function generateSimpleAudioThumbnail(
   title: string,
@@ -309,20 +331,82 @@ export async function generateSimpleAudioThumbnail(
   width = 1280,
   height = 720
 ): Promise<Buffer> {
-  // In a production environment, you would use a canvas library like node-canvas
-  // or generate a more sophisticated thumbnail using actual waveform data
+  // Create a simple PPM (Portable Pixmap) image
+  // P6 binary format: "P6\nwidth height\n255\n" followed by RGB bytes
 
-  // For now, return a placeholder image buffer (solid color with text)
-  // This is a minimal implementation - in production, implement proper canvas rendering
+  const bgColor = { r: 15, g: 15, b: 15 };     // #0f0f0f
+  const accentColor = { r: 255, g: 51, b: 51 }; // #ff3333
+  const textColor = { r: 255, g: 255, b: 255 }; // #ffffff
 
-  const placeholderSvg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-  <rect width="100%" height="100%" fill="#0f0f0f"/>
-  <text x="50%" y="40%" text-anchor="middle" fill="#ff0000" font-size="48" font-family="Arial, sans-serif">${title}</text>
-  ${artist ? `<text x="50%" y="50%" text-anchor="middle" fill="#ffffff" font-size="32" font-family="Arial, sans-serif">${artist}</text>` : ''}
-  <text x="50%" y="70%" text-anchor="middle" fill="#888888" font-size="24" font-family="Arial, sans-serif">Audio Content</text>
-  ${duration ? `<text x="50%" y="85%" text-anchor="middle" fill="#666666" font-size="20" font-family="Arial, sans-serif">Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}</text>` : ''}
-</svg>`
+  // Create header
+  const header = `P6\n${width} ${height}\n255\n`;
+  const headerBuffer = Buffer.from(header, 'utf-8');
 
-  return Buffer.from(placeholderSvg, 'utf-8')
+  // Create pixel buffer (width * height * 3 bytes)
+  const pixelBuffer = Buffer.alloc(width * height * 3);
+
+  // Fill with background color
+  for (let i = 0; i < width * height * 3; i += 3) {
+    pixelBuffer[i] = bgColor.r;     // R
+    pixelBuffer[i + 1] = bgColor.g; // G
+    pixelBuffer[i + 2] = bgColor.b; // B
+  }
+
+  // Draw a simple accent rectangle in the center (50% width, 20% height)
+  const rectWidth = Math.floor(width * 0.5);
+  const rectHeight = Math.floor(height * 0.2);
+  const rectX = Math.floor((width - rectWidth) / 2);
+  const rectY = Math.floor((height - rectHeight) / 2);
+
+  for (let y = rectY; y < rectY + rectHeight; y++) {
+    for (let x = rectX; x < rectX + rectWidth; x++) {
+      const index = (y * width + x) * 3;
+      pixelBuffer[index] = accentColor.r;
+      pixelBuffer[index + 1] = accentColor.g;
+      pixelBuffer[index + 2] = accentColor.b;
+    }
+  }
+
+  // Draw simple text "AUDIO" as block letters (5x7 font)
+  const text = "AUDIO";
+  const charWidth = 5;
+  const charHeight = 7;
+  const spacing = 2;
+  const textWidth = text.length * (charWidth + spacing) - spacing;
+  const textX = Math.floor((width - textWidth) / 2);
+  const textY = rectY + Math.floor(rectHeight / 2) - Math.floor(charHeight / 2);
+
+  // Simple 5x7 bitmap font for uppercase letters
+  const font: Record<string, number[]> = {
+    'A': [0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11],
+    'U': [0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
+    'D': [0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E],
+    'I': [0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E],
+    'O': [0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
+  };
+
+  for (let charIndex = 0; charIndex < text.length; charIndex++) {
+    const char = text[charIndex];
+    const bitmap = font[char] || font['A'];
+    const charStartX = textX + charIndex * (charWidth + spacing);
+
+    for (let row = 0; row < charHeight; row++) {
+      const rowBits = bitmap[row];
+      for (let col = 0; col < charWidth; col++) {
+        if (rowBits & (1 << (charWidth - 1 - col))) {
+          const x = charStartX + col;
+          const y = textY + row;
+          if (x >= 0 && x < width && y >= 0 && y < height) {
+            const index = (y * width + x) * 3;
+            pixelBuffer[index] = textColor.r;
+            pixelBuffer[index + 1] = textColor.g;
+            pixelBuffer[index + 2] = textColor.b;
+          }
+        }
+      }
+    }
+  }
+
+  // Combine header and pixel data
+  return Buffer.concat([headerBuffer, pixelBuffer]);
 }

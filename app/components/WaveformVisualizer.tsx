@@ -18,7 +18,7 @@ export function WaveformVisualizer({
   waveform,
   width = 160,
   height = 90,
-  color = '#ff0000', // YouTube red
+  color = '#ff3333', // Softer red
   backgroundColor = 'transparent',
   interactive = false,
   currentTime = 0,
@@ -55,19 +55,24 @@ export function WaveformVisualizer({
     const centerY = canvas.height / 2
     const maxBarHeight = canvas.height * 0.8
 
-    ctx.fillStyle = color
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.beginPath()
+
+    // Draw smooth line through waveform points
     for (let i = 0; i < normalized.length; i++) {
       const amplitude = normalized[i]
-      const barHeight = amplitude * maxBarHeight
+      const x = i * barWidth
+      const y = centerY - (amplitude * maxBarHeight) / 2
 
-      // Draw bar centered vertically
-      ctx.fillRect(
-        i * barWidth,
-        centerY - barHeight / 2,
-        Math.max(1, barWidth * 0.8),
-        barHeight
-      )
+      if (i === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
     }
+
+    ctx.stroke()
 
     // Draw playback progress indicator
     if (currentTime > 0 && currentTime <= 1) {
@@ -179,7 +184,7 @@ export function CompactWaveformVisualizer({
   waveform,
   width = 64,
   height = 36,
-  color = '#ff0000',
+  color = '#ff3333',
   backgroundColor = 'transparent'
 }: Omit<WaveformVisualizerProps, 'interactive' | 'currentTime' | 'onSeek' | 'className'>) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -210,18 +215,24 @@ export function CompactWaveformVisualizer({
     const centerY = canvas.height / 2
     const maxBarHeight = canvas.height * 0.6
 
-    ctx.fillStyle = color
+    ctx.strokeStyle = color
+    ctx.lineWidth = 1
+    ctx.beginPath()
+
+    // Draw simplified line waveform
     for (let i = 0; i < normalized.length; i += step) {
       const amplitude = normalized[i]
-      const barHeight = amplitude * maxBarHeight
+      const x = (i / step) * barWidth
+      const y = centerY - (amplitude * maxBarHeight) / 2
 
-      ctx.fillRect(
-        (i / step) * barWidth,
-        centerY - barHeight / 2,
-        Math.max(1, barWidth * 0.8),
-        barHeight
-      )
+      if (i === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
     }
+
+    ctx.stroke()
   }, [waveform, width, height, color, backgroundColor])
 
   return (

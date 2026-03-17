@@ -55,7 +55,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null)
   const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
     playlistName: '',
-    privacyStatus: 'public',
+    privacyStatus: 'private',
     maxVideos: 10,
     contentType: 'auto',
     // Upload mode

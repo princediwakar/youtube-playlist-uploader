@@ -250,7 +250,7 @@ export function AudioCard({
           waveform={audio.waveform || []}
           width="100%"
           height={100}
-          color="#ff0000"
+          color="#ff3333"
           backgroundColor="#0f0f0f"
           interactive={true}
           currentTime={currentTime}

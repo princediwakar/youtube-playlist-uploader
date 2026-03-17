@@ -1,3 +1,4 @@
+// app/api/audio/convert/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     const duration = formData.get('duration') as string
     const outputFormat = formData.get('outputFormat') as string || 'mp4'
     const waveformMode = formData.get('waveformMode') as string || 'cline'
-    const waveformColor = formData.get('waveformColor') as string || '0xff0000'
+    const waveformColor = formData.get('waveformColor') as string || '0xff3333'
 
     if (!audioFile) {
       return NextResponse.json({ error: 'Missing audio file' }, { status: 400 })
@@ -54,7 +55,13 @@ export async function POST(request: NextRequest) {
           backgroundColor: '0x0f0f0f',
           waveMode: waveformMode as any,
           fps: 25,
-          outputFormat
+          outputFormat,
+          showMetadata: true,
+          metadata: {
+            title
+          },
+          textColor: '0xffffff',
+          fontSize: 36
         }
       )
       console.log('Animated waveform video generated successfully')
@@ -73,7 +80,7 @@ export async function POST(request: NextRequest) {
         audioBuffer,
         thumbnailBuffer,
         audioFile.name,
-        'thumbnail.jpg',
+        thumbnailFile ? thumbnailFile.name : 'thumbnail.ppm',
         { duration: duration ? parseFloat(duration) : 10, title }
       )
     }

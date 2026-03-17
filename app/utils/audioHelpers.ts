@@ -1,4 +1,60 @@
+// app/utils/audioHelpers.ts
 import { AudioFile } from '@/app/types/media'
+
+// Basic audio analysis without Web Audio API
+export async function analyzeAudioBasic(file: File): Promise<{
+  duration: number
+  waveform: number[]  // Array of amplitude values (100-200 samples)
+  audioThumbnail: string  // Canvas-generated "video frame"
+  artist?: string
+  album?: string
+  genre?: string
+  audioFormat?: string
+  bitrate?: number
+  sampleRate?: number
+  channels?: number
+}> {
+  // Generate synthetic waveform (flat line with slight variations)
+  const samples = 100
+  const waveform: number[] = []
+  for (let i = 0; i < samples; i++) {
+    // Create a simple sine wave pattern for visualization
+    const t = i / samples * Math.PI * 4
+    waveform.push(0.3 + 0.2 * Math.sin(t))
+  }
+
+  // Generate audio thumbnail
+  const audioThumbnail = generateAudioThumbnail(waveform, file.name)
+
+  // Extract metadata from filename
+  const metadata = await extractAudioMetadata(file)
+
+  // Estimate duration based on file size and format (very rough estimate)
+  // Common bitrates: MP3 ~128kbps, WAV ~1411kbps, M4A ~128kbps
+  const extension = file.name.toLowerCase().split('.').pop() || ''
+  let estimatedBitrate = 128000 // 128 kbps default
+  if (extension === 'wav' || extension === 'flac') {
+    estimatedBitrate = 1411000 // 1411 kbps for lossless
+  } else if (extension === 'm4a' || extension === 'aac') {
+    estimatedBitrate = 128000
+  } else if (extension === 'ogg') {
+    estimatedBitrate = 96000 // 96 kbps typical for OGG
+  }
+
+  const estimatedDuration = file.size * 8 / estimatedBitrate // seconds
+  const bitrate = Math.round(estimatedBitrate / 1000) // kbps
+
+  return {
+    duration: estimatedDuration,
+    waveform,
+    audioThumbnail,
+    audioFormat: getAudioFormat(file.name),
+    bitrate,
+    sampleRate: 44100, // Common default
+    channels: 2, // Stereo default
+    ...metadata
+  }
+}
 
 // Web Audio API integration for audio analysis
 export async function analyzeAudio(file: File): Promise<{
@@ -14,9 +70,10 @@ export async function analyzeAudio(file: File): Promise<{
   channels?: number
 }> {
   return new Promise((resolve, reject) => {
-    // Feature detection for Web Audio API
-    if (!window.AudioContext && !(window as any).webkitAudioContext) {
-      reject(new Error('Web Audio API is not supported in this browser'))
+    // Feature detection for Web Audio API - fallback to basic analysis if not available
+    if (typeof window === 'undefined' || (!window.AudioContext && !(window as any).webkitAudioContext)) {
+      console.warn('Web Audio API not available, using basic audio analysis')
+      analyzeAudioBasic(file).then(resolve).catch(reject)
       return
     }
 
@@ -118,21 +175,23 @@ export function generateAudioThumbnail(waveform: number[], fileName: string): st
   const maxAmplitude = Math.max(...waveform)
   const normalizedWaveform = maxAmplitude > 0 ? waveform.map(v => v / maxAmplitude) : waveform
 
-  ctx.fillStyle = '#ff0000' // YouTube red
+  ctx.strokeStyle = '#ff3333' // Softer red
+  ctx.lineWidth = 2
   const barWidth = canvas.width / normalizedWaveform.length
   const centerY = canvas.height / 2
 
+  ctx.beginPath()
   for (let i = 0; i < normalizedWaveform.length; i++) {
     const amplitude = normalizedWaveform[i]
-    const barHeight = amplitude * (canvas.height * 0.8) / 2
+    const y = centerY - (amplitude * (canvas.height * 0.8) / 2)
 
-    ctx.fillRect(
-      i * barWidth,
-      centerY - barHeight,
-      barWidth * 0.8,
-      barHeight * 2
-    )
+    if (i === 0) {
+      ctx.moveTo(i * barWidth, y)
+    } else {
+      ctx.lineTo(i * barWidth, y)
+    }
   }
+  ctx.stroke()
 
   // Add file name text
   const displayName = fileName.replace(/\.[^/.]+$/, '') // Remove extension
@@ -148,7 +207,7 @@ export function generateAudioThumbnail(waveform: number[], fileName: string): st
   ctx.shadowBlur = 0
 
   // Add "Audio" badge
-  ctx.fillStyle = '#ff0000'
+  ctx.fillStyle = '#ff3333'
   ctx.fillRect(10, 10, 60, 25)
   ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 12px Arial, sans-serif'
@@ -270,7 +329,7 @@ export function generateAudioFrame(
   const width = options?.width || 1280
   const height = options?.height || 720
   const backgroundColor = options?.backgroundColor || '#0f0f0f'
-  const waveformColor = options?.waveformColor || '#ff0000'
+  const waveformColor = options?.waveformColor || '#ff3333'
   const textColor = options?.textColor || '#ffffff'
   const showMetadata = options?.showMetadata !== false
   const metadata = options?.metadata || {}
@@ -290,18 +349,21 @@ export function generateAudioFrame(
   const waveformTop = height * 0.3
   const barWidth = width / normalizedWaveform.length
 
-  ctx.fillStyle = waveformColor
+  ctx.strokeStyle = waveformColor
+  ctx.lineWidth = 3
+  ctx.beginPath()
   for (let i = 0; i < normalizedWaveform.length; i++) {
     const amplitude = normalizedWaveform[i]
     const barHeight = amplitude * waveformHeight
+    const y = waveformTop + (waveformHeight - barHeight) / 2
 
-    ctx.fillRect(
-      i * barWidth,
-      waveformTop + (waveformHeight - barHeight) / 2,
-      barWidth * 0.8,
-      barHeight
-    )
+    if (i === 0) {
+      ctx.moveTo(i * barWidth, y)
+    } else {
+      ctx.lineTo(i * barWidth, y)
+    }
   }
+  ctx.stroke()
 
   // Draw title
   ctx.fillStyle = textColor

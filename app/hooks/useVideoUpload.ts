@@ -94,7 +94,7 @@ export function useVideoUpload() {
                 width: 1280,
                 height: 720,
                 backgroundColor: '#0f0f0f',
-                waveformColor: '#ff0000',
+                waveformColor: '#ff3333',
                 textColor: '#ffffff',
                 showMetadata: true,
                 metadata: {

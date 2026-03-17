@@ -60,7 +60,7 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
                     waveform={video.waveform}
                     width={64}
                     height={36}
-                    color="#ff0000"
+                    color="#ff3333"
                     backgroundColor="#0f0f0f"
                   />
                 ) : video.audioThumbnail ? (

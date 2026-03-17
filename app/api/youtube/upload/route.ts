@@ -1,3 +1,4 @@
+// app/api/youtube/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
@@ -166,10 +167,16 @@ export async function POST(request: NextRequest) {
           {
             width: 1280,
             height: 720,
-            waveformColor: '0xff0000',     // YouTube red
+            waveformColor: '0xff3333',     // Softer red
             backgroundColor: '0x0f0f0f',   // Near-black
             waveMode: 'cline',             // Centered line — smooth and professional
-            fps: 25
+            fps: 25,
+            showMetadata: true,
+            metadata: {
+              title: finalTitle
+            },
+            textColor: '0xffffff',
+            fontSize: 36
           }
         )
         uploadFilename = uploadFilename.replace(/\.[^/.]+$/, '') + '.mp4'
@@ -196,7 +203,7 @@ export async function POST(request: NextRequest) {
             audioBuffer,
             thumbnailBuffer,
             videoFile.name,
-            'thumbnail.jpg',
+            thumbnailFile ? thumbnailFile.name : 'thumbnail.ppm',
             {
               duration: duration || 10,
               title: finalTitle
