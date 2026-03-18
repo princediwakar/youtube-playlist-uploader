@@ -47,8 +47,7 @@ export function useFileHandling() {
 
     if (newVideos.length === 0) return []
 
-    // Sort videos by path for logical order
-    newVideos.sort((a, b) => a.path.localeCompare(b.path))
+    // Preserve original folder/file order - no sorting
 
     // Add new videos to state and analyze them
     setVideos(prevVideos => {
@@ -138,8 +137,7 @@ export function useFileHandling() {
       return []
     }
 
-    // Sort videos by path for logical order
-    newVideos.sort((a, b) => a.path.localeCompare(b.path))
+    // Preserve original folder/file order - no sorting
 
     // Replace all videos and analyze them
     setVideos(() => {
