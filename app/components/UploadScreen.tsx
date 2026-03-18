@@ -163,46 +163,71 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         }
       }
 
-      // Phase 2: Filter duplicates BEFORE pre-processing
-      let videosToProcess = initialVideosToProcess
-      if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist && existingVideos.length > 0) {
-        videosToProcess = checkForDuplicateVideos(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix, uploadSettings.useAiAnalysis)
+      // Phase 2: Pre-processing FIRST to get actual titles for duplicate detection
+      const processedVideos = await preProcessVideos(initialVideosToProcess, uploadSettings)
 
-        const skippedCount = initialVideosToProcess.length - videosToProcess.length
+      // Phase 3: Filter duplicates using ACTUAL pre-processed titles
+      let videosToProcess = processedVideos
+      if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist && existingVideos.length > 0) {
+        // Extract titles from pre-processed videos for accurate duplicate detection
+        const preProcessedTitles = processedVideos.map(pv => pv.metadata.title)
+        
+        // Filter using actual AI-generated titles
+        videosToProcess = processedVideos.filter(pv => {
+          const videoTitle = pv.metadata.title
+          
+          // Check for exact title match with existing videos
+          const isDuplicate = existingVideos.some(existing => {
+            const existingTitle = existing.title.trim()
+            const newTitle = videoTitle.trim()
+            return existingTitle.toLowerCase() === newTitle.toLowerCase()
+          })
+
+          if (isDuplicate) {
+            console.log(`Skipping duplicate video: ${videoTitle}`)
+          }
+          return !isDuplicate
+        })
+
+        const skippedCount = processedVideos.length - videosToProcess.length
         if (skippedCount > 0) {
-          console.log(`Filtered ${skippedCount} duplicate videos before processing`)
+          console.log(`Filtered ${skippedCount} duplicate videos`)
           // Mark skipped videos as completed visually
-          const videosToProcessPaths = new Set(videosToProcess.map(v => v.path))
-          const skippedPaths = initialVideosToProcess
-            .filter(v => !videosToProcessPaths.has(v.path))
-            .map(v => v.path)
+          const videosToProcessPaths = new Set(videosToProcess.map(v => v.video.path))
+          const skippedPaths = processedVideos
+            .filter(v => !videosToProcessPaths.has(v.video.path))
+            .map(v => v.video.path)
           setVideos(prev => prev.map(v =>
             skippedPaths.includes(v.path) ? { ...v, status: 'completed', progress: 100 } : v
           ))
         }
       }
 
-      // Phase 3: Pre-processing (AI generation etc.) only on non-duplicates
-      const processedVideos = await preProcessVideos(videosToProcess, uploadSettings)
-
-      // Calculate positions for videos
+      // Phase 4: Calculate positions for non-duplicate videos
       let positions: number[] = []
       if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist) {
-        // Compute positions for all initial videos
-        const allPositions = calculateInsertionPositions(initialVideosToProcess, existingVideos, uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix, uploadSettings.useAiAnalysis)
-        // Map to videosToProcess (non-duplicates) using path for reliable lookup
+        // Use actual pre-processed titles for position calculation
+        const allPositions = calculateInsertionPositions(
+          processedVideos.map(pv => pv.video), 
+          existingVideos, 
+          uploadSettings.titleFormat, 
+          uploadSettings.customTitlePrefix, 
+          uploadSettings.customTitleSuffix, 
+          uploadSettings.useAiAnalysis
+        )
+        // Map to videosToProcess using path for reliable lookup
         const positionMap = new Map<string, number>()
-        initialVideosToProcess.forEach((video, index) => {
-          positionMap.set(video.path, allPositions[index])
+        processedVideos.forEach((pv, index) => {
+          positionMap.set(pv.video.path, allPositions[index])
         })
-        positions = videosToProcess.map(video => positionMap.get(video.path) || 0)
+        positions = videosToProcess.map(pv => positionMap.get(pv.video.path) || 0)
       } else {
         // New playlist or individual upload: positions start from 0
-        positions = processedVideos.map((_, index) => index)
+        positions = videosToProcess.map((_, index) => index)
       }
 
       // Prepare upload queue with positions
-      const uploadQueue = processedVideos.map(({ video, metadata }, index) => ({
+      const uploadQueue = videosToProcess.map(({ video, metadata }, index) => ({
         video,
         metadata,
         position: positions[index]
