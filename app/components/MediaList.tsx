@@ -14,11 +14,18 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
   // Calculate pending videos
   const pendingVideos = videos.filter(v => v.status === 'pending');
 
-  // Sort videos by status priority: pending > uploading > error > completed
+  // Group by status but preserve original folder/file order within each group
   const statusPriority = { 'pending': 0, 'uploading': 1, 'error': 2, 'completed': 3 };
-  const sortedVideos = [...videos].sort((a, b) => {
-    return statusPriority[a.status] - statusPriority[b.status];
+  
+  // Create a stable sort that maintains folder/file order within status groups
+  const videosWithStatus = videos.map((v, i) => ({ video: v, index: i }));
+  videosWithStatus.sort((a, b) => {
+    const priorityDiff = statusPriority[a.video.status] - statusPriority[b.video.status];
+    if (priorityDiff !== 0) return priorityDiff;
+    // Preserve original order within same status
+    return a.index - b.index;
   });
+  const sortedVideos = videosWithStatus.map(v => v.video);
 
   return (
     <div>
