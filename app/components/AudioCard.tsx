@@ -248,14 +248,13 @@ export function AudioCard({
 
         <WaveformVisualizer
           waveform={audio.waveform || []}
-          width="100%"
           height={100}
           color="#ff3333"
           backgroundColor="#0f0f0f"
           interactive={true}
           currentTime={currentTime}
           onSeek={handleSeek}
-          className="rounded-lg overflow-hidden"
+          className="rounded-lg overflow-hidden w-full"
         />
       </div>
 
