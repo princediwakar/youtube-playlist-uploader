@@ -293,10 +293,11 @@ export async function POST(request: NextRequest) {
       // Add to playlist if specified (only for playlist mode)
       if (uploadMode === 'playlist' && playlistId && videoId) {
         try {
+          const positionNum = position?.trim() ? parseInt(position, 10) : undefined
           await youtubeApi.addVideoToPlaylist(
             videoId,
             playlistId,
-            position ? parseInt(position) : undefined
+            Number.isNaN(positionNum) ? undefined : positionNum
           )
         } catch (playlistError) {
           console.error('Error adding to playlist:', playlistError)
