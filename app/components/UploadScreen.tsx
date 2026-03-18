@@ -63,8 +63,8 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     // Advanced settings
     madeForKids: false,
     category: '27', // Education
-    useAiAnalysis: true,
-    titleFormat: 'original',
+    useAiAnalysis: false,
+    titleFormat: 'cleaned',
     customTitlePrefix: '',
     customTitleSuffix: '',
     addPlaylistNavigation: true,
