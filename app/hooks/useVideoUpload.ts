@@ -168,9 +168,12 @@ export function useVideoUpload() {
     }
 
     let completedCount = 0
+    let hasError = false
 
     try {
       for (const chunk of chunks) {
+        if (hasError) break
+        
         const uploadPromises = chunk.map(async ({ video, metadata, position }) => {
           try {
             const result = await uploadVideo(video, metadata, uploadSettings, playlistId, position)
@@ -186,6 +189,7 @@ export function useVideoUpload() {
             if (onVideoError) {
               onVideoError(video, error as Error)
             }
+            hasError = true
             throw error
           }
         })
