@@ -39,6 +39,9 @@ export async function POST(request: NextRequest) {
     const sanitizedFilename = path.basename(originalFilename)
     const mediaType = videoFile.type.startsWith('audio/') ? 'audio' : 'video'
     const title = formData.get('title') as string
+    const descriptionFromForm = formData.get('description') as string
+    const tagsFromForm = formData.get('tags') as string
+    const categoryFromForm = formData.get('category') as string
     const contentType = formData.get('contentType') as string || 'auto'
     const privacyStatus = formData.get('privacyStatus') as string || 'unlisted'
     const playlistId = formData.get('playlistId') as string
@@ -52,7 +55,7 @@ export async function POST(request: NextRequest) {
     
     // Advanced settings
     const madeForKids = formData.get('madeForKids') === 'true'
-    const category = formData.get('category') as string || '27'
+    let category = categoryFromForm || '27'
     const useAiAnalysis = formData.get('useAiAnalysis') === 'true'
     const titleFormat = formData.get('titleFormat') as string || 'original'
     const customTitlePrefix = formData.get('customTitlePrefix') as string || ''
@@ -95,12 +98,47 @@ export async function POST(request: NextRequest) {
     allFiles = allFiles.map(file => path.basename(file))
     
     // AI Analysis Phase (blocking during upload)
+    // Use pre-processed metadata from frontend if available, otherwise use AI
     let finalTitle: string
     let description: string
     let tags: string[]
     let finalCategory = category
     
-    console.log('🤖 Starting AI analysis for:', sanitizedFilename)
+    const hasPreProcessedMetadata = title && descriptionFromForm && tagsFromForm
+    
+    if (hasPreProcessedMetadata) {
+      // Use pre-processed metadata from frontend (no AI analysis needed)
+      // This takes precedence regardless of useAiAnalysis flag - frontend already did the work
+      finalTitle = title
+      description = descriptionFromForm
+      try {
+        tags = JSON.parse(tagsFromForm)
+      } catch {
+        tags = []
+      }
+      console.log('Using pre-processed metadata from frontend:', {
+        title: finalTitle,
+        descriptionLength: description.length,
+        tagsCount: tags.length,
+        category: finalCategory
+      })
+    } else if (title) {
+      // Title provided but description/tags missing - use title, generate basic description/tags
+      finalTitle = title
+      description = descriptionFromForm || `Uploaded via YouTube Playlist Uploader`
+      try {
+        tags = tagsFromForm ? JSON.parse(tagsFromForm) : []
+      } catch {
+        tags = []
+      }
+      console.log('Using provided title, generated basic description/tags:', {
+        title: finalTitle,
+        descriptionLength: description.length,
+        tagsCount: tags.length
+      })
+    } else {
+      // AI analysis needed - either no pre-processed metadata or AI explicitly requested
+      console.log('🤖 Starting AI analysis for:', sanitizedFilename)
     try {
       const aiAnalysis = await analyzeContent(
         folderName,
@@ -130,6 +168,7 @@ export async function POST(request: NextRequest) {
     } catch (aiError) {
       console.error('AI analysis failed:', aiError)
       throw new Error(`AI analysis failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`)
+      }
     }
     
     // Optimize for YouTube Shorts

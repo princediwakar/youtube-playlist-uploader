@@ -241,8 +241,8 @@ export default function UploadScreen({ session }: UploadScreenProps) {
 
           // Add navigation links immediately if enabled
           if (uploadSettings.addPlaylistNavigation && result.videoId && playlistId) {
-            // Use addNavigationLinks from hook
-            addNavigationLinks(result.videoId, playlistId, uploadQueue.find(item => item.video.file === video.file)?.position || 0)
+            const queueItem = uploadQueue.find(item => item.video.file === video.file)
+            addNavigationLinks(result.videoId, playlistId, queueItem?.position || 0, queueItem?.metadata.title || video.name)
               .catch(navError => {
                 console.error('Navigation link failed for video:', video.name, navError)
               })

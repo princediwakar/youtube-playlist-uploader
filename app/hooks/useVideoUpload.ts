@@ -77,6 +77,7 @@ export function useVideoUpload() {
       formData.append('isShort', (isVideoFile(video) ? (video.isShort || false) : false).toString())
       formData.append('duration', (video.duration || 0).toString())
       formData.append('aspectRatio', (isVideoFile(video) ? (video.aspectRatio || 1.78) : 1.78).toString())
+      formData.append('useAiAnalysis', (uploadSettings.useAiAnalysis || false).toString())
 
       // For audio files, generate thumbnail based on settings
       if (isAudioFile(video)) {
@@ -202,7 +203,8 @@ export function useVideoUpload() {
   const addNavigationLinks = useCallback(async (
     videoId: string,
     playlistId: string,
-    position: number
+    position: number,
+    title: string
   ) => {
     if (!session?.accessToken) return
 
@@ -213,7 +215,8 @@ export function useVideoUpload() {
         body: JSON.stringify({
           videoId,
           playlistId,
-          position
+          position,
+          title
         })
       })
     } catch (error) {
