@@ -1,77 +1,136 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { MediaFile } from '@/app/types/video'
+import { useState, useCallback, useRef } from 'react'
+import { MediaFile } from '@/app/types/media'
 import { formatFileSize } from '@/app/utils/videoHelpers'
-import { analyzeMedia } from '@/app/utils/mediaHelpers'
+import { analyzeMedia, detectMediaType } from '@/app/utils/mediaHelpers'
+
+const MAX_FILE_SIZE = 256 * 1024 * 1024 // 256 MB (YouTube limit)
+const MAX_BATCH_SIZE = 500 // Maximum files per batch (YouTube allows large playlists)
+
+export interface FileValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+  validFiles: File[]
+  invalidFiles: File[]
+}
+
+export function validateFiles(files: File[]): FileValidationResult {
+  const errors: string[] = []
+  const warnings: string[] = []
+  const validFiles: File[] = []
+  const invalidFiles: File[] = []
+
+  // Separate media files from non-media files
+  for (const file of files) {
+    const mediaType = detectMediaType(file)
+    if (mediaType === 'unknown') {
+      invalidFiles.push(file)
+      warnings.push(`Skipped non-media file: ${file.name}`)
+    } else {
+      validFiles.push(file)
+    }
+  }
+
+  // Only validate media files
+  if (validFiles.length > MAX_BATCH_SIZE) {
+    errors.push(`Maximum ${MAX_BATCH_SIZE} media files per batch. Selected ${validFiles.length} files.`)
+  }
+
+  const oversizedFiles: string[] = []
+  for (const file of validFiles) {
+    if (file.size > MAX_FILE_SIZE) {
+      oversizedFiles.push(`${file.name} (${formatFileSize(file.size)})`)
+    }
+  }
+
+  if (oversizedFiles.length > 0) {
+    errors.push(`Files exceed 256MB limit: ${oversizedFiles.join(', ')}`)
+  }
+
+  return {
+    valid: errors.length === 0 && validFiles.length > 0,
+    errors,
+    warnings,
+    validFiles,
+    invalidFiles
+  }
+}
+
+function createMediaFile(file: File): MediaFile {
+  const fullPath = (file as any).webkitRelativePath || file.name
+  const pathParts = fullPath.split('/')
+  const fileName = pathParts[pathParts.length - 1]
+  const folderPath = pathParts.slice(0, -1).join('/')
+  const rootFolder = pathParts[0] || 'Root'
+  const detectedType = detectMediaType(file)
+  const mediaType = detectedType === 'unknown' ? 'video' : detectedType
+
+  return {
+    file,
+    name: fileName.replace(/\.[^/.]+$/, ''),
+    size: formatFileSize(file.size),
+    path: fullPath,
+    relativePath: folderPath,
+    folder: rootFolder,
+    status: 'pending',
+    progress: 0,
+    mediaType
+  }
+}
 
 export function useFileHandling() {
   const [videos, setVideos] = useState<MediaFile[]>([])
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const pendingAnalysisRef = useRef<Map<string, { startIndex: number; relativeIndex: number }>>(new Map())
 
-  const addVideos = useCallback((files: File[]) => {
-    const newVideos: MediaFile[] = []
+  const addVideos = useCallback((files: File[]): { added: MediaFile[]; errors: string[] } => {
+    const validation = validateFiles(files)
+    
+    if (!validation.valid) {
+      setValidationErrors(validation.errors)
+      return { added: [], errors: validation.errors }
+    }
+    
+    setValidationErrors([])
 
-    files.forEach(file => {
-      // Check if it's a video or audio file
-      const isVideo = file.type.startsWith('video/') ||
-          file.name.match(/\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v)$/i)
-      const isAudio = file.type.startsWith('audio/') ||
-          file.name.match(/\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|aiff|alac)$/i)
+    const newMediaFiles = validation.validFiles
+      .map(file => createMediaFile(file))
+      .filter(Boolean)
 
-      if (isVideo || isAudio) {
+    if (newMediaFiles.length === 0) return { added: [], errors: [] }
 
-        // Extract path information
-        const fullPath = (file as any).webkitRelativePath || file.name
-        const pathParts = fullPath.split('/')
-        const fileName = pathParts[pathParts.length - 1]
-        const folderPath = pathParts.slice(0, -1).join('/')
-        const rootFolder = pathParts[0] || 'Root'
+    newMediaFiles.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
 
-        // Determine media type
-        const isVideo = file.type.startsWith('video/') ||
-          file.name.match(/\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v)$/i)
+    const startIndex = videos.length
 
-        newVideos.push({
-          file,
-          name: fileName.replace(/\.[^/.]+$/, ''), // Remove extension
-          size: formatFileSize(file.size),
-          path: fullPath,
-          relativePath: folderPath,
-          folder: rootFolder,
-          status: 'pending',
-          progress: 0,
-          mediaType: isVideo ? 'video' : 'audio' // Will be updated properly after analysis
-        })
-      }
+    newMediaFiles.forEach((mediaFile, relativeIndex) => {
+      pendingAnalysisRef.current.set(mediaFile.path, { startIndex, relativeIndex })
     })
 
-    if (newVideos.length === 0) return []
+    setVideos(prevVideos => [...prevVideos, ...newMediaFiles])
 
-    // Sort by path to ensure folder order (folder/filename)
-    newVideos.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }))
+    newMediaFiles.forEach((mediaFile, relativeIndex) => {
+      const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
+      const actualStartIndex = storedRef?.startIndex ?? startIndex
+      const actualIndex = storedRef?.relativeIndex ?? relativeIndex
 
-    // Add new videos to state and analyze them
-    setVideos(prevVideos => {
-      const updatedVideos = [...prevVideos, ...newVideos]
-      const startIndex = prevVideos.length
-
-      // Start analysis for each new media file
-      newVideos.forEach(async (video, relativeIndex) => {
-        try {
-          const analysis = await analyzeMedia(video.file)
+      analyzeMedia(mediaFile.file)
+        .then(analysis => {
+          pendingAnalysisRef.current.delete(mediaFile.path)
           setVideos(currentVideos =>
             currentVideos.map((v, i) =>
-              i === startIndex + relativeIndex ? {
+              i === actualStartIndex + actualIndex ? {
                 ...v,
                 duration: analysis.duration,
-                // Video-specific properties
-                ...(video.mediaType === 'video' ? {
+                mediaType: analysis.mediaType,
+                ...(analysis.mediaType === 'video' ? {
                   thumbnail: analysis.thumbnail,
                   isShort: analysis.isShort,
                   aspectRatio: analysis.aspectRatio
                 } : {}),
-                // Audio-specific properties
-                ...(video.mediaType === 'audio' ? {
+                ...(analysis.mediaType === 'audio' ? {
                   audioThumbnail: analysis.audioThumbnail,
                   waveform: analysis.waveform,
                   artist: analysis.artist,
@@ -85,82 +144,65 @@ export function useFileHandling() {
               } : v
             )
           )
-        } catch (error) {
-          console.error(`Failed to analyze ${video.mediaType} ${video.name}:`, error)
-        }
-      })
-
-      return updatedVideos
-    })
-
-    return newVideos
-  }, [])
-
-  const replaceVideos = useCallback((files: File[]) => {
-    const newVideos: MediaFile[] = []
-
-    files.forEach(file => {
-      // Check if it's a video or audio file
-      const isVideo = file.type.startsWith('video/') ||
-          file.name.match(/\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v)$/i)
-      const isAudio = file.type.startsWith('audio/') ||
-          file.name.match(/\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|aiff|alac)$/i)
-
-      if (isVideo || isAudio) {
-
-        // Extract path information
-        const fullPath = (file as any).webkitRelativePath || file.name
-        const pathParts = fullPath.split('/')
-        const fileName = pathParts[pathParts.length - 1]
-        const folderPath = pathParts.slice(0, -1).join('/')
-        const rootFolder = pathParts[0] || 'Root'
-
-        // Determine media type
-        const isVideo = file.type.startsWith('video/') ||
-          file.name.match(/\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v)$/i)
-
-        newVideos.push({
-          file,
-          name: fileName.replace(/\.[^/.]+$/, ''), // Remove extension
-          size: formatFileSize(file.size),
-          path: fullPath,
-          relativePath: folderPath,
-          folder: rootFolder,
-          status: 'pending',
-          progress: 0,
-          mediaType: isVideo ? 'video' : 'audio' // Will be updated properly after analysis
         })
-      }
+        .catch(error => {
+          console.error(`Failed to analyze ${mediaFile.name}:`, error)
+          pendingAnalysisRef.current.delete(mediaFile.path)
+        })
     })
 
-    if (newVideos.length === 0) {
+    return { added: newMediaFiles, errors: [] }
+  }, [videos.length])
+
+  const replaceVideos = useCallback((files: File[]): { added: MediaFile[]; errors: string[] } => {
+    pendingAnalysisRef.current.clear()
+
+    const validation = validateFiles(files)
+    
+    if (!validation.valid) {
+      setValidationErrors(validation.errors)
       setVideos([])
-      return []
+      return { added: [], errors: validation.errors }
+    }
+    
+    setValidationErrors([])
+
+    const newMediaFiles = validation.validFiles
+      .map(file => createMediaFile(file))
+      .filter(Boolean)
+
+    if (newMediaFiles.length === 0) {
+      setVideos([])
+      return { added: [], errors: [] }
     }
 
-    // Preserve original folder/file order - no sorting
+    newMediaFiles.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
 
-    // Replace all videos and analyze them
-    setVideos(() => {
-      const startIndex = 0
+    newMediaFiles.forEach((mediaFile, relativeIndex) => {
+      pendingAnalysisRef.current.set(mediaFile.path, { startIndex: 0, relativeIndex })
+    })
 
-      // Start analysis for each media file
-      newVideos.forEach(async (video, relativeIndex) => {
-        try {
-          const analysis = await analyzeMedia(video.file)
+    setVideos(newMediaFiles)
+
+    newMediaFiles.forEach((mediaFile, relativeIndex) => {
+      const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
+      const actualIndex = storedRef?.relativeIndex ?? relativeIndex
+
+      analyzeMedia(mediaFile.file)
+        .then(analysis => {
+          pendingAnalysisRef.current.delete(mediaFile.path)
           setVideos(currentVideos =>
             currentVideos.map((v, i) =>
-              i === startIndex + relativeIndex ? {
+              i === actualIndex ? {
                 ...v,
                 duration: analysis.duration,
-                // Video-specific properties
-                ...(video.mediaType === 'video' ? {
+                mediaType: analysis.mediaType,
+                ...(analysis.mediaType === 'video' ? {
                   thumbnail: analysis.thumbnail,
                   isShort: analysis.isShort,
                   aspectRatio: analysis.aspectRatio
                 } : {}),
-                // Audio-specific properties
-                ...(video.mediaType === 'audio' ? {
+                ...(analysis.mediaType === 'audio' ? {
                   audioThumbnail: analysis.audioThumbnail,
                   waveform: analysis.waveform,
                   artist: analysis.artist,
@@ -174,15 +216,14 @@ export function useFileHandling() {
               } : v
             )
           )
-        } catch (error) {
-          console.error(`Failed to analyze ${video.mediaType} ${video.name}:`, error)
-        }
-      })
-
-      return newVideos
+        })
+        .catch(error => {
+          console.error(`Failed to analyze ${mediaFile.name}:`, error)
+          pendingAnalysisRef.current.delete(mediaFile.path)
+        })
     })
 
-    return newVideos
+    return { added: newMediaFiles, errors: [] }
   }, [])
 
   const removeVideo = useCallback((index: number) => {
@@ -213,6 +254,10 @@ export function useFileHandling() {
     )
   }, [])
 
+  const clearValidationErrors = useCallback(() => {
+    setValidationErrors([])
+  }, [])
+
   return {
     videos,
     setVideos,
@@ -221,6 +266,9 @@ export function useFileHandling() {
     removeVideo,
     clearVideos,
     updateVideoStatus,
-    resetVideoStatuses
+    resetVideoStatuses,
+    validationErrors,
+    clearValidationErrors,
+    validateFiles
   }
 }

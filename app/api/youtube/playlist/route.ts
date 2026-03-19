@@ -3,6 +3,113 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { YouTubeApiService } from '@/app/services/youtubeApi'
 
+// PUT - Update playlist
+export async function PUT(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.accessToken) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const { playlistId, title, description, privacyStatus } = await request.json()
+    
+    if (!playlistId) {
+      return NextResponse.json({ error: 'Playlist ID is required' }, { status: 400 })
+    }
+
+    const youtubeApi = new YouTubeApiService(session.accessToken as string)
+    
+    // Update playlist metadata
+    const updatedPlaylist = await youtubeApi.updatePlaylist(
+      playlistId,
+      title,
+      description,
+      (privacyStatus || 'unlisted') as 'private' | 'public' | 'unlisted'
+    )
+
+    return NextResponse.json({
+      success: true,
+      playlist: updatedPlaylist
+    })
+
+  } catch (error) {
+    console.error('Playlist update error:', error)
+    
+    let errorMessage = 'Failed to update playlist'
+    let errorDetails = 'Unknown error'
+    
+    if (error instanceof Error) {
+      errorDetails = error.message
+      
+      if (error.message.includes('Invalid Credentials') || error.message.includes('unauthorized')) {
+        errorMessage = 'Authentication failed'
+        errorDetails = 'Your YouTube access token has expired. Please sign out and sign in again.'
+      } else if (error.message.includes('forbidden')) {
+        errorMessage = 'Permission denied'
+        errorDetails = 'Insufficient permissions to update this playlist.'
+      }
+    }
+    
+    return NextResponse.json({ 
+      error: errorMessage, 
+      details: errorDetails 
+    }, { status: 500 })
+  }
+}
+
+// DELETE - Delete playlist
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.accessToken) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const playlistId = searchParams.get('playlistId')
+    
+    if (!playlistId) {
+      return NextResponse.json({ error: 'Playlist ID is required' }, { status: 400 })
+    }
+
+    const youtubeApi = new YouTubeApiService(session.accessToken as string)
+    await youtubeApi.deletePlaylist(playlistId)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Playlist deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('Playlist deletion error:', error)
+    
+    let errorMessage = 'Failed to delete playlist'
+    let errorDetails = 'Unknown error'
+    
+    if (error instanceof Error) {
+      errorDetails = error.message
+      
+      if (error.message.includes('Invalid Credentials') || error.message.includes('unauthorized')) {
+        errorMessage = 'Authentication failed'
+        errorDetails = 'Your YouTube access token has expired. Please sign out and sign in again.'
+      } else if (error.message.includes('forbidden')) {
+        errorMessage = 'Permission denied'
+        errorDetails = 'Insufficient permissions to delete this playlist.'
+      } else if (error.message.includes('notFound') || error.message.includes('not found')) {
+        errorMessage = 'Playlist not found'
+        errorDetails = 'The specified playlist could not be found.'
+      }
+    }
+    
+    return NextResponse.json({ 
+      error: errorMessage, 
+      details: errorDetails 
+    }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Playlist creation started')

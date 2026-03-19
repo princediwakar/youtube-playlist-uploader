@@ -8,8 +8,6 @@
  * - Large file processing
  */
 
-import { generateAudioThumbnail } from './audioHelpers';
-
 // Worker message types
 export type AudioWorkerMessage =
   | { type: 'ANALYZE_AUDIO'; id: string; arrayBuffer: ArrayBuffer; fileName: string; fileSize: number }
@@ -247,17 +245,7 @@ export class AudioAnalyzer {
           case 'ANALYZE_RESULT': {
             const request = this.pendingRequests.get(message.id);
             if (request) {
-              let result = message.result;
-              // Generate thumbnail if missing
-              if (!result.audioThumbnail && result.waveform && result.waveform.length > 0) {
-                try {
-                  // Use empty filename for thumbnail generation
-                  result.audioThumbnail = generateAudioThumbnail(result.waveform, 'audio');
-                } catch (error) {
-                  console.warn('Failed to generate audio thumbnail:', error);
-                  // Thumbnail remains undefined
-                }
-              }
+              const result = message.result;
               request.resolve(result);
               this.pendingRequests.delete(message.id);
             }
@@ -289,11 +277,12 @@ export class AudioAnalyzer {
 
       this.worker.onerror = (error) => {
         console.error('Audio worker error:', error);
-        // Reject all pending requests
         for (const [id, request] of this.pendingRequests.entries()) {
           request.reject('Worker error');
         }
         this.pendingRequests.clear();
+        this.worker?.terminate();
+        this.worker = null;
       };
 
     } catch (error) {

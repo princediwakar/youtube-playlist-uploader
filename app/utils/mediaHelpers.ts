@@ -16,6 +16,7 @@ import { analyzeAudioWithFallback } from './audioWorker'
 // Unified media analysis function
 export async function analyzeMedia(file: File): Promise<{
   duration: number
+  mediaType: 'video' | 'audio'
   thumbnail?: string
   audioThumbnail?: string
   waveform?: number[]
@@ -36,6 +37,7 @@ export async function analyzeMedia(file: File): Promise<{
       const videoAnalysis = await analyzeVideo(file)
       return {
         duration: videoAnalysis.duration,
+        mediaType: 'video',
         thumbnail: videoAnalysis.thumbnail,
         isShort: videoAnalysis.isShort,
         aspectRatio: videoAnalysis.aspectRatio
@@ -45,6 +47,7 @@ export async function analyzeMedia(file: File): Promise<{
       const audioAnalysis = await analyzeAudioWithFallback(file)
       return {
         duration: audioAnalysis.duration,
+        mediaType: 'audio',
         audioThumbnail: audioAnalysis.audioThumbnail,
         waveform: audioAnalysis.waveform,
         artist: audioAnalysis.artist,

@@ -44,11 +44,17 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   } = useVideoProcessing()
   const {
     isUploading,
+    isPaused,
     currentUpload,
     uploadQueue,
     uploadVideo,
     uploadVideos,
-    addNavigationLinks
+    addNavigationLinks,
+    uploadStats,
+    quotaWarning,
+    pauseUpload,
+    resumeUpload,
+    cancelUpload
   } = useVideoUpload()
 
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
@@ -77,7 +83,11 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   })
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newVideos = replaceVideos(acceptedFiles)
+    const { added: newVideos, errors } = replaceVideos(acceptedFiles)
+
+    if (errors.length > 0) {
+      console.error('File validation errors:', errors)
+    }
 
     if (newVideos.length === 0) return
 
@@ -110,184 +120,281 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     onDrop(files)
   }
 
-  // Optimized upload function
+  // Optimized upload function with batching support
   const handleOptimizedUpload = async () => {
     if (!session) return
 
     try {
-      const initialVideosToProcess = videos.filter(v => v.status === 'pending').slice(0, uploadSettings.maxVideos)
-
-      // Phase 1: Playlist management & fetch existing videos
+      // Keep uploading in batches until all pending videos are processed
+      let batchNumber = 0
+      let hasMoreVideos = true
       let playlistId: string | null = null
-      let existingVideos: Array<{videoId: string, title: string, position: number}> = []
+      let positionOffset = 0
 
-      if (uploadSettings.uploadMode === 'playlist') {
-        if (uploadSettings.useExistingPlaylist) {
-          if (!uploadSettings.selectedPlaylistId) {
-            throw new Error('Please select an existing playlist')
-          }
-          playlistId = uploadSettings.selectedPlaylistId
-          setCurrentPlaylistId(playlistId)
+      while (hasMoreVideos) {
+        batchNumber++
+        console.log(`Starting batch ${batchNumber}...`)
 
-          // Fetch existing videos for duplicate detection
-          existingVideos = await fetchExistingPlaylistVideos(playlistId) || []
-        } else {
-          if (!uploadSettings.playlistName) {
-            throw new Error('Please enter a playlist name')
-          }
-
-          // Generate description using all initial videos
-          const playlistDescription = await generatePlaylistDescription(initialVideosToProcess, uploadSettings)
-          const playlistResponse = await fetch('/api/youtube/playlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: uploadSettings.playlistName,
-              description: playlistDescription,
-              privacyStatus: uploadSettings.privacyStatus
-            })
-          })
-
-          if (!playlistResponse.ok) {
-            const error = await playlistResponse.json()
-            throw new Error(error.details || 'Failed to create playlist')
-          }
-
-          const { playlistId: newPlaylistId } = await playlistResponse.json()
-          playlistId = newPlaylistId
-          setCurrentPlaylistId(playlistId)
-
-          // Invalidate playlists cache when a new playlist is created
-          clearPlaylistCache()
-          console.log('Playlists cache invalidated due to new playlist creation')
-        }
-      }
-
-      // Phase 2: Pre-processing FIRST to get actual titles for duplicate detection
-      const processedVideos = await preProcessVideos(initialVideosToProcess, uploadSettings)
-
-      // Phase 3: Filter duplicates using ACTUAL pre-processed titles
-      let videosToProcess = processedVideos
-      if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist && existingVideos.length > 0) {
-        // Extract titles from pre-processed videos for accurate duplicate detection
-        const preProcessedTitles = processedVideos.map(pv => pv.metadata.title)
+        // Get current pending videos (in case state changed)
+        const currentVideos = videos.filter(v => v.status === 'pending')
         
-        // Filter using actual AI-generated titles
-        videosToProcess = processedVideos.filter(pv => {
-          const videoTitle = pv.metadata.title
-          
-          // Check for exact title match with existing videos
-          const isDuplicate = existingVideos.some(existing => {
-            const existingTitle = existing.title.trim()
-            const newTitle = videoTitle.trim()
-            return existingTitle.toLowerCase() === newTitle.toLowerCase()
+        if (currentVideos.length === 0) {
+          console.log('No more pending videos to upload')
+          break
+        }
+
+        const initialVideosToProcess = currentVideos.slice(0, uploadSettings.maxVideos)
+        const remainingCount = currentVideos.length - initialVideosToProcess.length
+        console.log(`Batch ${batchNumber}: ${initialVideosToProcess.length} videos (${remainingCount} remaining)`)
+
+        // Phase 1: Playlist management & fetch existing videos
+        let existingVideos: Array<{videoId: string, title: string, position: number}> = []
+
+        if (uploadSettings.uploadMode === 'playlist') {
+          if (uploadSettings.useExistingPlaylist) {
+            if (!uploadSettings.selectedPlaylistId) {
+              throw new Error('Please select an existing playlist')
+            }
+            playlistId = uploadSettings.selectedPlaylistId
+            setCurrentPlaylistId(playlistId)
+
+            // Fetch existing videos for duplicate detection (force refresh for up-to-date data)
+            let fetchedVideos: any[] = []
+            try {
+              fetchedVideos = await fetchExistingPlaylistVideos(playlistId, true) || []
+            } catch (fetchError) {
+              console.error('Failed to fetch existing playlist videos:', fetchError)
+              fetchedVideos = []
+            }
+            existingVideos = fetchedVideos.filter(
+              v => v && typeof v.videoId === 'string' && typeof v.title === 'string'
+            )
+            console.log(`Batch ${batchNumber}: Fetched ${existingVideos.length} existing videos from playlist`)
+          } else {
+            // Only create playlist once (first batch)
+            if (batchNumber === 1) {
+              if (!uploadSettings.playlistName) {
+                throw new Error('Please enter a playlist name')
+              }
+
+              // Generate description using all initial videos
+              const playlistDescription = await generatePlaylistDescription(initialVideosToProcess, uploadSettings)
+              const playlistResponse = await fetch('/api/youtube/playlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: uploadSettings.playlistName,
+                  description: playlistDescription,
+                  privacyStatus: uploadSettings.privacyStatus
+                })
+              })
+
+              if (!playlistResponse.ok) {
+                const error = await playlistResponse.json()
+                throw new Error(error.details || 'Failed to create playlist')
+              }
+
+              const { playlistId: newPlaylistId } = await playlistResponse.json()
+              playlistId = newPlaylistId
+              setCurrentPlaylistId(playlistId)
+            }
+            
+            // For subsequent batches, fetch existing videos for position calculation (force refresh)
+            if (playlistId) {
+              let fetchedVideos: any[] = []
+              try {
+                fetchedVideos = await fetchExistingPlaylistVideos(playlistId, true) || []
+              } catch (fetchError) {
+                console.error('Failed to fetch existing playlist videos:', fetchError)
+                fetchedVideos = []
+              }
+              existingVideos = fetchedVideos.filter(
+                v => v && typeof v.videoId === 'string' && typeof v.title === 'string'
+              )
+              console.log(`Batch ${batchNumber}: Found ${existingVideos.length} existing videos in playlist`)
+            }
+          }
+        }
+
+        // Phase 2: Pre-processing FIRST to get actual titles for duplicate detection
+        const processedVideos = await preProcessVideos(initialVideosToProcess, uploadSettings)
+
+        // Phase 3: Filter duplicates using ACTUAL pre-processed titles
+        let videosToProcess = processedVideos
+        
+        // Build a Set of existing titles for O(1) lookup (normalized: lowercase, trimmed)
+        const existingTitles = new Set<string>()
+        for (const existing of existingVideos) {
+          if (existing?.title && typeof existing.title === 'string') {
+            existingTitles.add(existing.title.trim().toLowerCase())
+          }
+        }
+        
+        if (uploadSettings.uploadMode === 'playlist' && existingTitles.size > 0) {
+          // Filter using actual AI-generated titles
+          videosToProcess = processedVideos.filter(pv => {
+            const videoTitle = pv.metadata?.title || ''
+            const normalizedTitle = videoTitle.trim().toLowerCase()
+            
+            // Check for exact title match with existing videos
+            const isDuplicate = existingTitles.has(normalizedTitle)
+
+            if (isDuplicate) {
+              console.log(`Skipping duplicate video: ${videoTitle}`)
+            }
+            return !isDuplicate
           })
 
-          if (isDuplicate) {
-            console.log(`Skipping duplicate video: ${videoTitle}`)
+          const skippedCount = processedVideos.length - videosToProcess.length
+          if (skippedCount > 0) {
+            console.log(`Filtered ${skippedCount} duplicate videos`)
+            // Mark skipped videos as completed visually
+            const videosToProcessPaths = new Set(videosToProcess.map(v => v.video.path))
+            const skippedPaths = processedVideos
+              .filter(v => !videosToProcessPaths.has(v.video.path))
+              .map(v => v.video.path)
+            setVideos(prev => prev.map(v =>
+              skippedPaths.includes(v.path) ? { ...v, status: 'completed', progress: 100 } : v
+            ))
           }
-          return !isDuplicate
-        })
-
-        const skippedCount = processedVideos.length - videosToProcess.length
-        if (skippedCount > 0) {
-          console.log(`Filtered ${skippedCount} duplicate videos`)
-          // Mark skipped videos as completed visually
-          const videosToProcessPaths = new Set(videosToProcess.map(v => v.video.path))
-          const skippedPaths = processedVideos
-            .filter(v => !videosToProcessPaths.has(v.video.path))
-            .map(v => v.video.path)
-          setVideos(prev => prev.map(v =>
-            skippedPaths.includes(v.path) ? { ...v, status: 'completed', progress: 100 } : v
-          ))
         }
-      }
 
-      // Phase 4: Calculate positions for non-duplicate videos
-      let positions: number[] = []
-      if (uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist) {
-        // Use actual pre-processed titles for position calculation
-        const allPositions = calculateInsertionPositions(
-          processedVideos.map(pv => pv.video), 
-          existingVideos, 
-          uploadSettings.titleFormat, 
-          uploadSettings.customTitlePrefix, 
-          uploadSettings.customTitleSuffix, 
-          uploadSettings.useAiAnalysis
-        )
-        // Map to videosToProcess using path for reliable lookup
-        const positionMap = new Map<string, number>()
-        processedVideos.forEach((pv, index) => {
-          positionMap.set(pv.video.path, allPositions[index])
-        })
-        positions = videosToProcess.map(pv => positionMap.get(pv.video.path) || 0)
-      } else {
-        // New playlist or individual upload: positions start from 0
-        positions = videosToProcess.map((_, index) => index)
-      }
-
-      // Prepare upload queue with positions
-      const uploadQueue = videosToProcess.map(({ video, metadata }, index) => ({
-        video,
-        metadata,
-        position: positions[index]
-      }))
-
-      // Update status to uploading for all videos in the queue
-      setVideos(prev => prev.map(v =>
-        uploadQueue.some(item => item.video.file === v.file)
-          ? { ...v, status: 'uploading', progress: 0 }
-          : v
-      ))
-
-      // Phase 4: Use uploadVideos hook for parallel uploads
-      await uploadVideos(
-        uploadQueue,
-        uploadSettings,
-        playlistId || undefined,
-        // onProgress callback
-        (completed, total) => {
-          // Progress is tracked via video status updates in onVideoComplete/onVideoError
-        },
-        // onVideoComplete callback
-        (video, result) => {
-          // Update status to completed
-          setVideos(prev => prev.map(v =>
-            v.file === video.file
-              ? { ...v, status: 'completed', progress: 100, videoId: result.videoId }
-              : v
+        // Phase 4: Calculate positions for non-duplicate videos
+        let positions: number[] = []
+        
+        // Early exit: if no videos to process after duplicate filtering, skip to next batch
+        if (videosToProcess.length === 0) {
+          console.log(`Batch ${batchNumber}: All videos are duplicates, skipping`)
+          // Mark all pending videos as completed (they're all duplicates)
+          setVideos(prev => prev.map(v => 
+            v.status === 'pending' ? { ...v, status: 'completed', progress: 100 } : v
           ))
-
-          // Invalidate playlist videos cache when video is successfully uploaded to playlist
-          if (playlistId) {
-            clearPlaylistVideosCache(playlistId)
-            console.log('Playlist videos cache invalidated for playlist:', playlistId)
+          hasMoreVideos = videos.filter(v => v.status === 'pending').length > 0
+          continue
+        }
+        
+        if (uploadSettings.uploadMode === 'playlist') {
+          if (uploadSettings.useExistingPlaylist) {
+            // Use actual pre-processed titles for position calculation (only non-duplicates)
+            const allPositions = calculateInsertionPositions(
+              videosToProcess.map(pv => pv.video), 
+              existingVideos, 
+              uploadSettings.titleFormat, 
+              uploadSettings.customTitlePrefix, 
+              uploadSettings.customTitleSuffix, 
+              uploadSettings.useAiAnalysis
+            )
+            // Map to videosToProcess using path for reliable lookup
+            const positionMap = new Map<string, number>()
+            videosToProcess.forEach((pv, index) => {
+              positionMap.set(pv.video.path, allPositions[index])
+            })
+            positions = videosToProcess.map(pv => positionMap.get(pv.video.path) || 0)
+            console.log(`Batch ${batchNumber}: Calculated positions for ${videosToProcess.length} videos (existing: ${existingVideos.length})`, positions)
+          } else {
+            // New playlist: positions continue from previous batch
+            positions = videosToProcess.map((_, index) => positionOffset + index)
+            positionOffset += videosToProcess.length
+            console.log(`Batch ${batchNumber}: Using offset positions starting at ${positions[0]}, offset now: ${positionOffset}`)
           }
+        } else {
+          // Individual upload: positions start from 0
+          positions = videosToProcess.map((_, index) => index)
+          console.log(`Batch ${batchNumber}: Using sequential positions for individual upload`)
+        }
 
-          // Add navigation links immediately if enabled
-          if (uploadSettings.addPlaylistNavigation && result.videoId && playlistId) {
-            const queueItem = uploadQueue.find(item => item.video.file === video.file)
-            addNavigationLinks(result.videoId, playlistId, queueItem?.position || 0, queueItem?.metadata.title || video.name)
-              .catch(navError => {
-                console.error('Navigation link failed for video:', video.name, navError)
+        // Prepare upload queue with positions
+        const uploadQueue = videosToProcess.map(({ video, metadata }, index) => ({
+          video,
+          metadata,
+          position: positions[index]
+        }))
+        console.log(`Batch ${batchNumber}: Upload queue prepared with ${uploadQueue.length} videos, positions:`, uploadQueue.map(q => ({ name: q.video.name, position: q.position })))
+
+        // Update status to uploading for all videos in the queue
+        setVideos(prev => prev.map(v =>
+          uploadQueue.some(item => item.video.file === v.file)
+            ? { ...v, status: 'uploading', progress: 0 }
+            : v
+        ))
+
+        // Phase 5: Use uploadVideos hook for parallel uploads
+        await uploadVideos(
+          uploadQueue,
+          uploadSettings,
+          playlistId || undefined,
+          // onProgress callback
+          (completed, total) => {
+            // Progress is tracked via video status updates in onVideoComplete/onVideoError
+          },
+          // onVideoComplete callback
+          (video, result) => {
+            // Update status to completed
+            setVideos(prev => prev.map(v =>
+              v.file === video.file
+                ? { ...v, status: 'completed', progress: 100, videoId: result.videoId }
+                : v
+            ))
+
+            // Update existingPlaylistVideos to prevent false duplicates in subsequent batches
+            if (playlistId && uploadSettings.uploadMode === 'playlist') {
+              setExistingPlaylistVideos(prev => {
+                if (!prev) return prev
+                const queueItem = uploadQueue.find(item => item.video.file === video.file)
+                const position = queueItem?.position ?? prev.length
+                return [
+                  ...prev,
+                  { videoId: result.videoId, title: video.name, position }
+                ]
               })
+            }
+
+            // Invalidate playlist videos cache when video is successfully uploaded to playlist
+            if (playlistId) {
+              clearPlaylistVideosCache(playlistId)
+              console.log('Playlist videos cache invalidated for playlist:', playlistId)
+            }
+
+            // Add navigation links immediately if enabled
+            if (uploadSettings.addPlaylistNavigation && result.videoId && playlistId) {
+              const queueItem = uploadQueue.find(item => item.video.file === video.file)
+              addNavigationLinks(result.videoId, playlistId, queueItem?.position || 0, queueItem?.metadata.title || video.name)
+                .catch(navError => {
+                  console.error('Navigation link failed for video:', video.name, navError)
+                })
+            }
+          },
+          // onVideoError callback
+          (video, error) => {
+            console.error('Upload error for video:', video.name, error)
+            setVideos(prev => prev.map(v =>
+              v.file === video.file
+                ? {
+                    ...v,
+                    status: 'error',
+                    progress: 0,
+                    error: error instanceof Error ? error.message : 'Upload failed'
+                  }
+                : v
+            ))
           }
-        },
-        // onVideoError callback
-        (video, error) => {
-          console.error('Upload error for video:', video.name, error)
-          setVideos(prev => prev.map(v =>
-            v.file === video.file
-              ? {
-                  ...v,
-                  status: 'error',
-                  progress: 0,
-                  error: error instanceof Error ? error.message : 'Upload failed'
-                }
-              : v
-          ))
+        )
+
+        // Check if there are more pending videos for the next batch
+        const remainingPending = videos.filter(v => v.status === 'pending')
+        hasMoreVideos = remainingPending.length > 0
+        
+        if (hasMoreVideos) {
+          console.log(`Batch ${batchNumber} complete. ${remainingPending.length} videos remaining.`)
         }
-      )
+      }
+
+      // Invalidate playlists cache after all uploads complete (only for new playlists)
+      if (playlistId && !uploadSettings.useExistingPlaylist) {
+        clearPlaylistCache()
+        clearPlaylistVideosCache(playlistId)
+        console.log('Playlists cache invalidated after all uploads complete')
+      }
 
     } catch (error) {
       console.error('Upload process error:', error)
@@ -472,6 +579,13 @@ export default function UploadScreen({ session }: UploadScreenProps) {
           currentPlaylistId={currentPlaylistId}
           totalVideos={totalVideos}
           completedUploads={completedUploads}
+          isUploading={isUploading}
+          isPaused={isPaused}
+          uploadStats={uploadStats}
+          quotaWarning={quotaWarning}
+          onPause={pauseUpload}
+          onResume={resumeUpload}
+          onCancel={cancelUpload}
           onRemoveVideo={removeVideo}
         />
       </div>

@@ -172,7 +172,7 @@ export function generateAudioThumbnail(waveform: number[], fileName: string): st
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   // Draw waveform
-  const maxAmplitude = Math.max(...waveform)
+  const maxAmplitude = waveform.length ? Math.max(...waveform) : 0
   const normalizedWaveform = maxAmplitude > 0 ? waveform.map(v => v / maxAmplitude) : waveform
 
   ctx.strokeStyle = '#ff3333' // Softer red
@@ -217,29 +217,72 @@ export function generateAudioThumbnail(waveform: number[], fileName: string): st
   return canvas.toDataURL('image/jpeg', 0.8)
 }
 
-// Extract audio metadata from file (basic implementation)
+// Extract audio metadata from file (enhanced implementation)
 async function extractAudioMetadata(file: File): Promise<{
   artist?: string
   album?: string
   genre?: string
 }> {
-  // This is a basic implementation
-  // In a production app, you would use a library like music-metadata-browser
-  // to extract ID3 tags, Vorbis comments, etc.
-
   const metadata: { artist?: string; album?: string; genre?: string } = {}
 
   // Extract basic info from filename as fallback
   const fileName = file.name.replace(/\.[^/.]+$/, '')
 
-  // Simple pattern: "Artist - Song" or "Artist - Album - Song"
-  const parts = fileName.split(' - ')
-  if (parts.length >= 2) {
-    metadata.artist = parts[0].trim()
-
-    if (parts.length >= 3) {
-      metadata.album = parts[1].trim()
+  // Pattern 1: "Artist - Title" or "Artist - Album - Title"
+  const dashParts = fileName.split(' - ')
+  if (dashParts.length >= 2) {
+    metadata.artist = dashParts[0].trim()
+    
+    // If 3+ parts, second is likely album
+    if (dashParts.length >= 3) {
+      metadata.album = dashParts[1].trim()
     }
+    
+    // Try to detect genre from filename keywords
+    const genrePatterns = [
+      { pattern: /rock/i, genre: 'Rock' },
+      { pattern: /pop/i, genre: 'Pop' },
+      { pattern: /jazz/i, genre: 'Jazz' },
+      { pattern: /classical/i, genre: 'Classical' },
+      { pattern: /electronic|edm|house|techno/i, genre: 'Electronic' },
+      { pattern: /hip-hop|hiphop|rap/i, genre: 'Hip-Hop' },
+      { pattern: /country/i, genre: 'Country' },
+      { pattern: /r&b|rhythm.*blues/i, genre: 'R&B' },
+      { pattern: /metal/i, genre: 'Metal' },
+      { pattern: /folk/i, genre: 'Folk' },
+      { pattern: /indie/i, genre: 'Indie' },
+      { pattern: /soundtrack|ost/i, genre: 'Soundtrack' }
+    ]
+    
+    for (const { pattern, genre } of genrePatterns) {
+      if (pattern.test(fileName)) {
+        metadata.genre = genre
+        break
+      }
+    }
+  }
+
+  // Pattern 2: "Title (Artist)" or "Title [Artist]"
+  if (!metadata.artist) {
+    const parenMatch = fileName.match(/^(.+?)\s*[\(\[]\s*(.+?)\s*[\)\]]$/)
+    if (parenMatch) {
+      metadata.artist = parenMatch[2].trim()
+    }
+  }
+
+  // Pattern 3: Try to extract year from filename
+  const yearMatch = fileName.match(/\b(19|20)\d{2}\b/)
+  if (yearMatch) {
+    // Store year as part of filename info (can be used in album if needed)
+    const year = yearMatch[0]
+    if (metadata.album) {
+      metadata.album = `${metadata.album} (${year})`
+    }
+  }
+
+  // Clean up common prefix patterns like track numbers
+  if (metadata.artist) {
+    metadata.artist = metadata.artist.replace(/^\d+[\.\-_]\s*/, '')
   }
 
   return metadata
@@ -342,7 +385,7 @@ export function generateAudioFrame(
   ctx.fillRect(0, 0, width, height)
 
   // Draw waveform visualization
-  const maxAmplitude = Math.max(...waveform)
+  const maxAmplitude = waveform.length ? Math.max(...waveform) : 0
   const normalizedWaveform = maxAmplitude > 0 ? waveform.map(v => v / maxAmplitude) : waveform
 
   const waveformHeight = height * 0.4

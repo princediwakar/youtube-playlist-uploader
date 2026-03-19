@@ -30,14 +30,18 @@ export interface PlaylistItem {
 
 export class YouTubeApiService {
   private youtube: ReturnType<typeof google.youtube>
+  private oauth2Client: InstanceType<typeof google.auth.OAuth2>
 
-  constructor(accessToken: string) {
-    const oauth2Client = new google.auth.OAuth2(
+  constructor(accessToken: string, refreshToken?: string) {
+    this.oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
     )
-    oauth2Client.setCredentials({ access_token: accessToken })
-    this.youtube = google.youtube({ version: 'v3', auth: oauth2Client })
+    this.oauth2Client.setCredentials({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    })
+    this.youtube = google.youtube({ version: 'v3', auth: this.oauth2Client })
   }
 
   async uploadVideo(
@@ -45,12 +49,10 @@ export class YouTubeApiService {
     filename: string,
     metadata: VideoMetadata
   ): Promise<UploadResponse> {
-    // Extract basename and sanitize filename (remove path separators)
     const basename = path.basename(filename).replace(/[\/\\]/g, '_');
     const tempFilePath = `/tmp/${Date.now()}-${basename}`;
     console.log('Writing temporary video file:', { filename, basename, tempFilePath });
     const fs = await import('fs');
-    const { v4: uuidv4 } = await import('uuid');
 
     try {
       fs.writeFileSync(tempFilePath, fileBuffer)
@@ -177,6 +179,41 @@ export class YouTubeApiService {
   async deletePlaylist(playlistId: string): Promise<void> {
     await this.youtube.playlists.delete({
       id: playlistId
+    })
+  }
+
+  async updatePlaylist(
+    playlistId: string,
+    title: string,
+    description: string,
+    privacyStatus: 'private' | 'public' | 'unlisted' = 'private'
+  ): Promise<{ id: string; snippet: { title: string; description: string } }> {
+    const response = await this.youtube.playlists.update({
+      part: ['snippet', 'status'],
+      requestBody: {
+        id: playlistId,
+        snippet: {
+          title,
+          description
+        },
+        status: {
+          privacyStatus
+        }
+      }
+    })
+
+    return {
+      id: response.data.id!,
+      snippet: {
+        title: response.data.snippet?.title || title,
+        description: response.data.snippet?.description || description
+      }
+    }
+  }
+
+  async removeVideoFromPlaylist(playlistItemId: string): Promise<void> {
+    await this.youtube.playlistItems.delete({
+      id: playlistItemId
     })
   }
 }

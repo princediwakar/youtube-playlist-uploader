@@ -30,18 +30,39 @@ export async function GET(request: NextRequest) {
 
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
 
-    // Get videos from the playlist
-    const response = await youtube.playlistItems.list({
-      part: ['snippet', 'contentDetails'],
-      playlistId: playlistId,
-      maxResults: 50 // Get up to 50 videos
-    })
+    const videos: Array<{videoId: string, title: string, position: number}> = []
+    let nextPageToken: string | undefined = undefined
+    let pageCount = 0
+    const MAX_PAGES = 200 // Safety limit to prevent infinite loops
 
-    const videos = response.data.items?.map(item => ({
-      videoId: item.contentDetails?.videoId,
-      title: item.snippet?.title,
-      position: item.snippet?.position
-    })) || []
+    do {
+      pageCount++
+      if (pageCount > MAX_PAGES) {
+        console.warn('Reached max page limit, stopping pagination')
+        break
+      }
+
+      try {
+        const response = await youtube.playlistItems.list({
+          part: ['snippet', 'contentDetails'],
+          playlistId: playlistId,
+          maxResults: 50,
+          pageToken: nextPageToken
+        })
+
+        const items = response.data.items?.map(item => ({
+          videoId: item.contentDetails?.videoId,
+          title: item.snippet?.title,
+          position: item.snippet?.position
+        })) || []
+
+        videos.push(...items)
+        nextPageToken = response.data.nextPageToken
+      } catch (pageError) {
+        console.error('Error fetching page', pageCount, ':', pageError)
+        break // Stop pagination on error but return what we have
+      }
+    } while (nextPageToken)
 
     return NextResponse.json({
       success: true,

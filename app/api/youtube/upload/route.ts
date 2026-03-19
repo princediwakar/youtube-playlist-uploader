@@ -123,15 +123,16 @@ export async function POST(request: NextRequest) {
         category: finalCategory
       })
     } else if (title) {
-      // Title provided but description/tags missing - use title, generate basic description/tags
+      // Title provided but description/tags missing - use title as-is with empty metadata
+      // No backend AI analysis needed - use basic defaults
       finalTitle = title
-      description = descriptionFromForm || `Uploaded via YouTube Playlist Uploader`
+      description = descriptionFromForm || ''
       try {
         tags = tagsFromForm ? JSON.parse(tagsFromForm) : []
       } catch {
         tags = []
       }
-      console.log('Using provided title, generated basic description/tags:', {
+      console.log('Using provided title with fallback metadata:', {
         title: finalTitle,
         descriptionLength: description.length,
         tagsCount: tags.length
@@ -299,9 +300,15 @@ export async function POST(request: NextRequest) {
             playlistId,
             Number.isNaN(positionNum) ? undefined : positionNum
           )
+          console.log(`Video ${videoId} added to playlist ${playlistId} at position ${positionNum ?? 'end'}`)
         } catch (playlistError) {
-          console.error('Error adding to playlist:', playlistError)
-          // Continue even if playlist addition fails
+          console.error('Error adding video to playlist:', {
+            videoId,
+            playlistId,
+            error: playlistError instanceof Error ? playlistError.message : 'Unknown error'
+          })
+          // Note: Video uploaded successfully, just not added to playlist
+          // The video is still accessible on YouTube directly
         }
       }
 

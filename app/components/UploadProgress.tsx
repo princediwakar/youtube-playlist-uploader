@@ -1,8 +1,16 @@
 'use client'
 
-import { FileVideo, Upload, CheckCircle, Database } from 'lucide-react'
+import { FileVideo, Upload, CheckCircle, Pause, Play, X, AlertTriangle } from 'lucide-react'
 import { MediaList } from './MediaList'
 import { MediaFile, UploadSettings } from '@/app/types/video'
+
+interface UploadStats {
+  totalBytes: number
+  uploadedBytes: number
+  uploadSpeed: number
+  estimatedTimeRemaining: number
+  startTime: number
+}
 
 interface UploadProgressProps {
   videos: MediaFile[]
@@ -25,6 +33,13 @@ interface UploadProgressProps {
   currentPlaylistId: string | null
   totalVideos: number
   completedUploads: number
+  isUploading?: boolean
+  isPaused?: boolean
+  uploadStats?: UploadStats | null
+  quotaWarning?: string | null
+  onPause?: () => void
+  onResume?: () => void
+  onCancel?: () => void
   onRemoveVideo: (index: number) => void
 }
 
@@ -39,13 +54,28 @@ export function UploadProgress({
   currentPlaylistId,
   totalVideos,
   completedUploads,
+  isUploading,
+  isPaused,
+  uploadStats,
+  quotaWarning,
+  onPause,
+  onResume,
+  onCancel,
   onRemoveVideo
 }: UploadProgressProps) {
   const pendingVideos = videos.filter(v => v.status === 'pending');
   const completedVideos = videos.filter(v => v.status === 'completed');
+  const errorVideos = videos.filter(v => v.status === 'error');
   const totalVideosCount = videos.length;
   const overallPercentage = totalVideosCount > 0 ? (completedVideos.length / totalVideosCount) * 100 : 100;
   const batchLimit = uploadSettings.maxVideos;
+
+  const formatTime = (seconds: number): string => {
+    if (!seconds || !isFinite(seconds)) return '--:--'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
 
   // If no videos, show empty state
   if (videos.length === 0) {
@@ -67,9 +97,50 @@ export function UploadProgress({
   return (
     <div className="bg-yt-panel border border-yt-border rounded-xl sticky top-28 overflow-hidden w-full max-w-full">
       <div className="p-4 border-b border-yt-border bg-[#F9F9F9]">
-        <h3 className="text-yt-text-primary font-medium text-base">Progress</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-yt-text-primary font-medium text-base">Progress</h3>
+          {isUploading && (
+            <div className="flex items-center gap-2">
+              {isPaused ? (
+                <button
+                  onClick={onResume}
+                  className="p-1.5 rounded-md bg-yt-blue/20 text-yt-blue hover:bg-yt-blue/30 transition-colors"
+                  title="Resume upload"
+                >
+                  <Play size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={onPause}
+                  className="p-1.5 rounded-md bg-yt-bg text-yt-text-secondary hover:text-yt-text-primary transition-colors"
+                  title="Pause upload"
+                >
+                  <Pause size={16} />
+                </button>
+              )}
+              <button
+                onClick={onCancel}
+                className="p-1.5 rounded-md bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
+                title="Cancel upload"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       <div className="p-4 space-y-4">
+        {/* Quota Warning */}
+        {quotaWarning && (
+          <div className="flex items-start space-x-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
+            <AlertTriangle size={16} className="text-yellow-500 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-500">Quota Warning</p>
+              <p className="text-xs text-yt-text-secondary">{quotaWarning}</p>
+            </div>
+          </div>
+        )}
+
         {/* Overall Progress */}
         <div>
           <div className="flex items-center justify-between text-sm text-yt-text-secondary mb-2">
@@ -78,17 +149,31 @@ export function UploadProgress({
           </div>
           <div className="h-1 bg-yt-bg rounded-full overflow-hidden">
             <div
-              className="h-full bg-yt-blue transition-all duration-300 rounded-full"
+              className={`h-full transition-all duration-300 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-yt-blue'}`}
               style={{ width: `${overallPercentage}%` }}
             />
           </div>
           <div className="flex items-center justify-between text-xs text-yt-text-secondary mt-2">
             <span>Pending: {pendingVideos.length} video{pendingVideos.length !== 1 ? 's' : ''}</span>
+            {errorVideos.length > 0 && (
+              <span className="text-red-500">Failed: {errorVideos.length}</span>
+            )}
             {pendingVideos.length > batchLimit && (
               <span className="text-yt-text-primary">Batch limit: {batchLimit}</span>
             )}
           </div>
         </div>
+
+        {/* Upload Stats */}
+        {isUploading && uploadStats && (
+          <div className="flex items-center justify-between text-xs text-yt-text-secondary">
+            <span className="flex items-center gap-1">
+              <Upload size={12} className={isPaused ? 'text-yellow-500' : 'text-yt-blue'} />
+              {isPaused ? 'Paused' : 'Uploading'}
+            </span>
+            <span>ETA: {formatTime(uploadStats.estimatedTimeRemaining)}</span>
+          </div>
+        )}
 
         {/* Duplicate Videos Info */}
         {uploadSettings.useExistingPlaylist && (

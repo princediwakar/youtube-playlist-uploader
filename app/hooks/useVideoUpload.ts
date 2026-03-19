@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { MediaFile, UploadSettings, isVideoFile, isAudioFile } from '@/app/types/video'
 import { generateAudioFrame } from '@/app/utils/audioHelpers'
@@ -14,6 +14,15 @@ export interface UploadQueueItem {
     category: string
   }
   position: number
+  retryCount?: number
+}
+
+export interface UploadStats {
+  totalBytes: number
+  uploadedBytes: number
+  uploadSpeed: number
+  estimatedTimeRemaining: number
+  startTime: number
 }
 
 export function useVideoUpload() {
@@ -21,8 +30,87 @@ export function useVideoUpload() {
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [currentUpload, setCurrentUpload] = useState<string | null>(null)
   const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
+  const [uploadStats, setUploadStats] = useState<UploadStats | null>(null)
+  const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
+
+  // Refs for upload control
+  const isPausedRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const statsRef = useRef<UploadStats | null>(null)
+
+  const MAX_RETRIES = 3
+  const RETRY_DELAYS = [1000, 5000, 15000] // Exponential backoff
+
+  // Pause upload
+  const pauseUpload = useCallback(() => {
+    isPausedRef.current = true
+    setIsPaused(true)
+  }, [])
+
+  // Resume upload
+  const resumeUpload = useCallback(() => {
+    isPausedRef.current = false
+    setIsPaused(false)
+  }, [])
+
+  // Cancel upload
+  const cancelUpload = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    isPausedRef.current = false
+    statsRef.current = null
+    setIsPaused(false)
+    setIsUploading(false)
+    setUploadQueue([])
+    setCurrentUpload(null)
+    setUploadStats(null)
+    setQuotaWarning(null)
+  }, [])
+
+  // Retry a failed upload with exponential backoff
+  const retryWithBackoff = useCallback(async <T,>(
+    fn: () => Promise<T>,
+    maxRetries: number = MAX_RETRIES
+  ): Promise<T> => {
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        const delay = RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]
+        console.log(`Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+
+      try {
+        return await fn()
+      } catch (error) {
+        lastError = error as Error
+
+        // Don't retry on certain errors
+        if (error instanceof Error) {
+          // Quota errors - don't retry
+          if (error.message.includes('quota') || error.message.includes('QUOTA_EXCEEDED')) {
+            throw error
+          }
+          // Auth errors - don't retry
+          if (error.message.includes('unauthorized') || error.message.includes('expired')) {
+            throw error
+          }
+          // User aborted - don't retry
+          if (error.name === 'AbortError') {
+            throw error
+          }
+        }
+      }
+    }
+
+    throw lastError || new Error('Max retries exceeded')
+  }, [])
 
   // Helper function to convert data URL to File
   const dataURLtoFile = (dataUrl: string, filename: string): File => {
@@ -63,8 +151,8 @@ export function useVideoUpload() {
       formData.append('title', metadata.title)
       formData.append('description', metadata.description)
       formData.append('tags', JSON.stringify(metadata.tags))
-      // Use audio category for audio files, generic category for video files
-      formData.append('category', isAudioFile(video) ? uploadSettings.audioCategory : metadata.category)
+      // Use pre-generated category from metadata (contains correct category for both audio and video)
+      formData.append('category', metadata.category)
       if (playlistId) {
         formData.append('playlistId', playlistId)
         if (position !== undefined) {
@@ -78,6 +166,9 @@ export function useVideoUpload() {
       formData.append('duration', (video.duration || 0).toString())
       formData.append('aspectRatio', (isVideoFile(video) ? (video.aspectRatio || 1.78) : 1.78).toString())
       formData.append('useAiAnalysis', (uploadSettings.useAiAnalysis || false).toString())
+      formData.append('titleFormat', uploadSettings.titleFormat || 'original')
+      formData.append('customTitlePrefix', uploadSettings.customTitlePrefix || '')
+      formData.append('customTitleSuffix', uploadSettings.customTitleSuffix || '')
 
       // For audio files, generate thumbnail based on settings
       if (isAudioFile(video)) {
@@ -145,7 +236,7 @@ export function useVideoUpload() {
     }
   }, [session?.accessToken])
 
-  // Upload multiple videos with concurrency control
+  // Upload multiple videos with concurrency control and retry logic
   const uploadVideos = useCallback(async (
     queue: UploadQueueItem[],
     uploadSettings: UploadSettings,
@@ -158,26 +249,57 @@ export function useVideoUpload() {
       throw new Error('Not authenticated')
     }
 
+    // Initialize stats
+    const startTime = Date.now()
+    const totalBytes = queue.reduce((sum, item) => sum + (item.video.file?.size || 0), 0)
+    statsRef.current = { totalBytes, uploadedBytes: 0, uploadSpeed: 0, estimatedTimeRemaining: 0, startTime }
+    setUploadStats(statsRef.current)
+    abortControllerRef.current = new AbortController()
+
     setIsUploading(true)
+    setIsPaused(false)
+    isPausedRef.current = false
     setUploadQueue(queue)
 
-    const concurrencyLimit = 3
+    const concurrencyLimit = 1
     const chunks = []
     for (let i = 0; i < queue.length; i += concurrencyLimit) {
       chunks.push(queue.slice(i, i + concurrencyLimit))
     }
 
     let completedCount = 0
-    let hasError = false
+    let failedCount = 0
+    const failedItems: UploadQueueItem[] = []
 
     try {
       for (const chunk of chunks) {
-        if (hasError) break
-        
-        const uploadPromises = chunk.map(async ({ video, metadata, position }) => {
+        // Check for pause
+        while (isPausedRef.current) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+
+        // Check for abort
+        if (abortControllerRef.current?.signal.aborted) {
+          console.log('Upload cancelled')
+          break
+        }
+
+        const uploadPromises = chunk.map(async (item) => {
+          const { video, metadata, position } = item
+          const retryCount = item.retryCount || 0
+
           try {
-            const result = await uploadVideo(video, metadata, uploadSettings, playlistId, position)
+            // Use retry logic for uploads
+            const result = await retryWithBackoff(async () => {
+              // Check pause before retry
+              while (isPausedRef.current) {
+                await new Promise(resolve => setTimeout(resolve, 500))
+              }
+              return uploadVideo(video, metadata, uploadSettings, playlistId, position)
+            }, MAX_RETRIES - retryCount)
+
             completedCount++
+            updateStats(completedCount, queue.length, startTime)
             if (onProgress) {
               onProgress(completedCount, queue.length)
             }
@@ -186,22 +308,77 @@ export function useVideoUpload() {
             }
             return result
           } catch (error) {
+            failedCount++
+            const errorMessage = error instanceof Error ? error.message : 'Upload failed'
+
+            // Check for quota errors
+            if (errorMessage.includes('quota') || errorMessage.includes('QUOTA')) {
+              setQuotaWarning('YouTube API quota exceeded. Consider reducing batch size.')
+              console.warn('Quota warning:', errorMessage)
+            }
+
             if (onVideoError) {
               onVideoError(video, error as Error)
             }
-            hasError = true
-            throw error
+
+            // Add to failed items for retry
+            failedItems.push({ ...item, retryCount: retryCount + 1 })
+
+            return null
           }
         })
 
         await Promise.all(uploadPromises)
       }
+
+      // Retry failed items once more
+      if (failedItems.length > 0 && !abortControllerRef.current?.signal.aborted) {
+        console.log(`Retrying ${failedItems.length} failed uploads...`)
+        for (const item of failedItems) {
+          if (isPausedRef.current) {
+            while (isPausedRef.current) {
+              await new Promise(resolve => setTimeout(resolve, 500))
+            }
+          }
+
+          try {
+            const result = await uploadVideo(item.video, item.metadata, uploadSettings, playlistId, item.position)
+            completedCount++
+            if (onVideoComplete) {
+              onVideoComplete(item.video, result)
+            }
+          } catch (error) {
+            console.error(`Final retry failed for ${item.video.name}:`, error)
+          }
+        }
+      }
+
     } finally {
       setIsUploading(false)
+      setIsPaused(false)
       setUploadQueue([])
       setCurrentUpload(null)
+      setUploadStats(null)
     }
-  }, [session?.accessToken, uploadVideo])
+  }, [session?.accessToken, uploadVideo, retryWithBackoff])
+
+  // Helper to update stats
+  const updateStats = (completed: number, total: number, startTime: number) => {
+    if (!statsRef.current) return
+
+    const elapsed = (Date.now() - startTime) / 1000
+    const progress = completed / total
+    const estimatedTotal = elapsed / progress
+    const remaining = estimatedTotal - elapsed
+
+    statsRef.current = {
+      ...statsRef.current,
+      uploadedBytes: completed,
+      uploadSpeed: completed / elapsed,
+      estimatedTimeRemaining: remaining
+    }
+    setUploadStats({ ...statsRef.current })
+  }
 
   // Add navigation links to uploaded video
   const addNavigationLinks = useCallback(async (
@@ -225,19 +402,25 @@ export function useVideoUpload() {
       })
     } catch (error) {
       console.error('Navigation link failed for video:', videoId, error)
-      throw error
     }
   }, [session?.accessToken])
 
   return {
     // State
     isUploading,
+    isPaused,
     currentUpload,
     uploadQueue,
+    uploadStats,
+    quotaWarning,
 
     // Functions
     uploadVideo,
     uploadVideos,
-    addNavigationLinks
+    addNavigationLinks,
+    pauseUpload,
+    resumeUpload,
+    cancelUpload,
+    clearQuotaWarning: () => setQuotaWarning(null)
   }
 }

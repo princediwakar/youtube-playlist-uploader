@@ -17,6 +17,63 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com/v1'
 })
 
+// Rate limiter for AI API calls
+class RateLimiter {
+  private queue: Array<() => void> = []
+  private activeCount = 0
+  private readonly maxConcurrent: number
+  private readonly minInterval: number
+  private lastCallTime = 0
+
+  constructor(maxConcurrent = 3, minInterval = 1000) {
+    this.maxConcurrent = maxConcurrent
+    this.minInterval = minInterval
+  }
+
+  async acquire(): Promise<void> {
+    return new Promise((resolve) => {
+      const tryAcquire = () => {
+        const now = Date.now()
+        const timeSinceLastCall = now - this.lastCallTime
+        
+        if (this.activeCount < this.maxConcurrent && timeSinceLastCall >= this.minInterval) {
+          this.activeCount++
+          this.lastCallTime = Date.now()
+          resolve()
+        } else {
+          const waitTime = Math.max(
+            100,
+            this.activeCount >= this.maxConcurrent ? 500 : this.minInterval - timeSinceLastCall
+          )
+          setTimeout(tryAcquire, waitTime)
+        }
+      }
+      tryAcquire()
+    })
+  }
+
+  release(): void {
+    this.activeCount = Math.max(0, this.activeCount - 1)
+    
+    // Process next in queue
+    if (this.queue.length > 0) {
+      const next = this.queue.shift()
+      if (next) next()
+    }
+  }
+
+  async withLimit<T>(fn: () => Promise<T>): Promise<T> {
+    await this.acquire()
+    try {
+      return await fn()
+    } finally {
+      this.release()
+    }
+  }
+}
+
+const aiRateLimiter = new RateLimiter(3, 1000)
+
 // Audio file extensions for detection
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.opus', '.aiff', '.alac']
 
@@ -82,92 +139,82 @@ This file is an AUDIO file (${currentFileName}). Adapt your metadata accordingly
 - Category: Use "10" (Music) or "24" (Entertainment)
 ` : ''
 
-    const prompt = `Analyze this ${mediaLabel} content collection and generate YouTube metadata:
+  const prompt = `Analyze this VIDEO COURSE content and generate comprehensive YouTube metadata.
 
-FOLDER/COURSE NAME: "${folderName}"
-CURRENT ${mediaLabel.toUpperCase()} FILE: "${currentFileName}"
-RELATIVE PATH: "${relativePath}"
-MEDIA TYPE: ${isAudio ? 'AUDIO' : 'VIDEO'}${isAllAudio ? ' (entire collection is audio)' : ''}
+COURSE NAME: "${folderName}"
+CURRENT LESSON: "${currentFileName}"
+MODULE PATH: "${relativePath}"
+TOTAL LESSONS: ${allFileNames.length}
 
-ALL FILES IN COLLECTION:
+ALL LESSONS IN COURSE (use this to understand the full curriculum):
 ${allFileNames.map((name, index) => `${index + 1}. ${name}`).join('\n')}
 
-Based on this analysis, please provide:
+${relativePath ? `CURRENT MODULE: Extract the module name from the relative path (e.g., "03. Identify Model Opportunities")` : ''}
 
-1. **Title**: Create an engaging, clickable YouTube title based ONLY on the current filename (max 70 chars optimal, 100 chars max). Use power words like "Ultimate", "Complete", "Essential", "Step-by-Step". Spark curiosity, include primary keyword, and make it professional.
-2. **Description**: Create a compelling YouTube description tailored to the content type. First, analyze the content type (educational, tutorial, entertainment, informational, creative, professional, music, podcast, audiobook) based on folder names and filenames.
+Based on the curriculum above and the current lesson, provide:
 
-**For EDUCATIONAL/TUTORIAL content** (courses, lectures, how-to guides):
-- Start with a bold title: 🎯 **[Title]**
-- Include learning objectives: 📚 **What You'll Learn:** with 3-5 bullet points
-- Add context about the course/series
-- Include practical applications or key takeaways
-- Call to action for engagement (comments, questions)
-- Relevant hashtags
+1. **Title**: Create an engaging YouTube title based ONLY on the current lesson filename (max 70 chars). Clean up numbering, keep the topic. Make it professional and clickable.
 
-**For ENTERTAINMENT content** (vlogs, comedy, gaming, reviews):
-- Engaging hook that captures the content's energy
-- Brief overview of what happens
-- Highlights or memorable moments
-- Personal connection or behind-the-scenes notes
-- Strong call to action (subscribe, notifications)
-- Fun, relevant hashtags
+2. **Description**: Write a COMPREHENSIVE description that:
+   - Opens with a compelling hook about what viewers will learn
+   - Uses the course context: THIS LESSON is part of "${folderName}" course
+   - Describes the specific topics covered in THIS lesson ("${currentFileName}")
+   - References how this lesson connects to the overall course structure
+   - Includes 4-6 specific learning outcomes or key points covered
+   - Has clear sections with headers:
+     • 📚 **What You'll Learn In This Lesson** (specific topics)
+     • 🎯 **Course Context** (where this fits in the overall curriculum)
+     • 💡 **Key Takeaways** (actionable insights)
+     • 🔗 **Continue Learning** (encourage watching next lesson)
+   - Add hashtags: #learning #education #[specific topic]
+   - Minimum 300 words for substantive content
+   - NO generic "Uploaded via" text
 
-**For INFORMATIONAL/CREATIVE content** (documentaries, art, music, DIY):
-- Context about the topic or creative process
-- Key insights or techniques covered
-- Background information or sources
-- Engagement prompts for the community
-- Appropriate hashtags for discovery
-${audioSpecificPrompt}
-**General guidelines for all descriptions:**
-- Use appropriate emojis for visual appeal (🎯, 📚, 💡, 🚀, 🎵, 🎙️, etc.)
-- Include clear sections with headers
-- Add value proposition: why should viewers watch/listen?
-- Mention if part of a series/playlist
-- Include 5-8 relevant hashtags at the end
-- Keep professional tone for educational/professional content, casual for entertainment
-- Optimize for YouTube SEO with relevant keywords
+3. **Playlist Description**: Create an engaging playlist description for "${folderName}" that:
+   - Explains the course structure (list the modules/lessons)
+   - Describes learning outcomes and target audience
+   - Mentions prerequisites if any
+   - Professional and compelling
 
-3. **Playlist Description**: Create an engaging playlist description for the entire collection that explains the structure, outcomes, and target audience.
-4. **Tags**: Generate 8-12 relevant YouTube tags including 2-3 broad tags, 5-7 niche tags, and 2-3 long-tail keyword tags.${isAudio ? ' Include audio/music/podcast-relevant tags.' : ''}
-5. **Category**: Select most appropriate YouTube category ID from: 27(Education), 28(Science&Tech), 26(Howto&Style), 22(People&Blogs), 24(Entertainment), 19(Travel), 17(Sports), 15(Pets), 10(Music), 2(Autos&Vehicles), 20(Gaming)${isAudio ? '. For music content, use 10. For podcasts, use 22 or 27.' : ''}
-6. **Theme**: Identify the main theme/topic (be specific)
-7. **Target Audience**: Describe who this content is for (demographics, interests, skill level)
-8. **Skill Level**: beginner/intermediate/advanced
+4. **Tags**: Generate 10-15 relevant YouTube tags including:
+   - Course name keywords
+   - Specific lesson topics
+   - Educational/professional tags
+   - YouTube category keywords
 
-IMPORTANT GUIDELINES:
-- **Content Type Analysis**: First analyze the content type based on folder names, filenames, and context. Adapt tone, structure, and formatting accordingly.
-- **Educational/Professional**: Use formal tone, structured sections, learning objectives, practical applications.
-- **Entertainment/Casual**: Use engaging, conversational tone, highlight fun moments, build personal connection.
-- **Creative/Informational**: Focus on process, techniques, insights, and community engagement.${isAudio ? '\n- **Audio Content**: Recognize this is audio, not video. Use listening-oriented language ("listen", "hear", "tune in") instead of viewing language ("watch", "see").' : ''}
-- **Titles**: Use ONLY the filename content, remove file extensions, clean up numbering/formatting but do NOT include folder names or paths. Create titles that make viewers want to click.
-- **Titles SEO**: Include primary keyword naturally, keep under 70 characters for optimal visibility. Use power words appropriate to content type.
-- **Descriptions**: Be specific to actual content, not generic. Highlight unique value proposition for the target audience.
-- **Value Focus**: What will viewers learn/experience/gain? Why should they watch this specific ${mediaLabel}?
-- **SEO Optimization**: Use relevant keywords throughout title, description, and tags for YouTube discoverability.
-- **Series Context**: Consider position in series and reference adjacent items if helpful for navigation.
-- **Formatting**: Use proper paragraph breaks, appropriate emojis, and clear section headers for readability.
-- **Tags Strategy**: Mix broad (2-3), niche (5-7), and long-tail (2-3) keywords for maximum discoverability across search intent levels.
+5. **Category**: "27" (Education)
+6. **Theme**: Main theme from folder name
+7. **Target Audience**: Professionals looking to improve monetization strategy
+8. **Skill Level**: intermediate/advanced
 
-Respond ONLY with valid JSON in this exact format:
+CRITICAL REQUIREMENTS:
+- The description MUST reference specific lesson topics from "${currentFileName}"
+- Mention THIS lesson's specific content, not generic course descriptions
+- If current lesson is "01. Introduction", describe intro topics
+- If current lesson is "05. Pricing Strategies", describe pricing content
+- Use the full curriculum to show progression
+- NEVER use generic placeholder text like "Uploaded via YouTube Playlist Uploader"
+- Descriptions should be 300-500 words with substantive content about the actual video
+
+Respond ONLY with valid JSON:
 {
-  "videoTitle": "Your title here",
-  "videoDescription": "Your description here...",
-  "playlistDescription": "Your playlist description here...",
-  "tags": ["tag1", "tag2", "tag3"],
+  "videoTitle": "Clean title based on filename",
+  "videoDescription": "300-500 word comprehensive description with specific lesson content...",
+  "playlistDescription": "Playlist description...",
+  "tags": ["tag1", "tag2", ...],
   "category": "27",
   "theme": "Main theme",
-  "targetAudience": "Target audience",
-  "skillLevel": "beginner/intermediate/advanced"
+  "targetAudience": "Who this is for",
+  "skillLevel": "intermediate"
 }`
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert YouTube content strategist and metadata optimizer with deep knowledge of different content types:
+    const response = await aiRateLimiter.withLimit(async () => {
+      return deepseek.chat.completions.create({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert YouTube content strategist and metadata optimizer with deep knowledge of different content types:
 1. **Educational/Tutorial Content**: Courses, lectures, how-to guides, skill development
 2. **Entertainment Content**: Vlogs, comedy, commentary, reviews, gaming
 3. **Informational Content**: Documentaries, news, explainers, analysis
@@ -188,14 +235,15 @@ Your expertise includes:
 - Optimizing podcast metadata (episode numbers, guest names, topic summaries)
 
 Always produce professional, engaging metadata that drives watch time, retention, and subscriber growth.`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 4000
+      })
     })
 
     const content = response.choices[0]?.message?.content
@@ -243,44 +291,59 @@ export async function analyzePlaylistContent(
   allFileNames: string[]
 ): Promise<{ description: string; theme: string }> {
   try {
-    const prompt = `Analyze this video course/playlist and generate an engaging description:
+    const prompt = `Create a comprehensive YouTube playlist description for this video course:
 
-COURSE/PLAYLIST NAME: "${folderName}"
+PLAYLIST NAME: "${folderName}"
+TOTAL VIDEOS: ${allFileNames.length}
 
-VIDEO FILES:
+ALL LESSONS/VIDEOS:
 ${allFileNames.map((name, index) => `${index + 1}. ${name}`).join('\n')}
 
-Create a compelling playlist description that:
-1. **Hook & Overview:** Start with an engaging hook that grabs attention and explains what the course covers.
-2. **Value Proposition:** Highlight the unique value and benefits of completing this playlist.
-3. **Learning Outcomes:** List 4-6 key things viewers will learn or achieve.
-4. **Target Audience:** Describe who this course is perfect for (beginners, professionals, enthusiasts).
-5. **Course Structure:** Briefly mention the number of videos and how they're organized.
-6. **Call to Action:** Encourage viewers to subscribe, turn on notifications, and watch the first video.
-7. **Hashtags:** Include 5-7 relevant hashtags at the end for discoverability.
+Write a compelling, professional playlist description (400-600 words) that:
 
-Make the description professional, engaging, and optimized for YouTube SEO. Use emojis sparingly for visual appeal.
+1. **Opening Hook (2-3 sentences):** Start with a powerful hook about why this topic matters and what viewers will gain. Create urgency around the problem this course solves.
 
-Respond with JSON:
+2. **Course Overview:** Explain what this course covers and the specific skills/knowledge viewers will acquire. Reference the actual lesson names to show depth.
+
+3. **What You'll Master (5-6 bullet points):** List specific learning outcomes using the actual video/lesson titles as reference. Be concrete about skills gained.
+
+4. **Perfect For:** Define the ideal audience (specific roles, industries, skill levels). Be specific, not generic.
+
+5. **Course Structure:** Briefly describe how the ${allFileNames.length} videos are organized and why this structure works for learning.
+
+6. **Closing CTA:** Strong call to action - subscribe, notifications, start with video 1.
+
+7. **Hashtags (5-8):** Relevant, discoverable hashtags.
+
+IMPORTANT:
+- Use the ACTUAL lesson names from the video list above
+- Make it professional and compelling
+- 400-600 words minimum
+- No placeholder text or generic content
+- Optimize for YouTube SEO
+
+Respond ONLY with JSON:
 {
-  "description": "Your playlist description here...",
-  "theme": "Main theme/topic"
+  "description": "Your complete playlist description here...",
+  "theme": "Main theme"
 }`
 
-    const response = await deepseek.chat.completions.create({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert YouTube playlist strategist and educational content marketer. You create compelling, SEO-optimized playlist descriptions that drive subscriptions, watch time, and viewer engagement. Your descriptions are professional, value-driven, and perfectly targeted to the intended audience.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
+    const response = await aiRateLimiter.withLimit(async () => {
+      return deepseek.chat.completions.create({
+        model: 'deepseek-chat',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert YouTube playlist strategist and educational content marketer. You create compelling, SEO-optimized playlist descriptions that drive subscriptions, watch time, and viewer engagement. Your descriptions are professional, value-driven, and perfectly targeted to the intended audience.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 3000
+      })
     })
 
     const content = response.choices[0]?.message?.content

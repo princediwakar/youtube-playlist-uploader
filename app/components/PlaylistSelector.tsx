@@ -1,8 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { UploadSettings, PlaylistItem } from '@/app/types/video'
+
+// YouTube playlist ID format validation
+const YOUTUBE_PLAYLIST_ID_REGEX = /^(PL|LL|UL|FL|OL)[a-zA-Z0-9_-]{31,}$/
+
+export function validatePlaylistId(playlistId: string): boolean {
+  if (!playlistId || playlistId.trim() === '') return false
+  return YOUTUBE_PLAYLIST_ID_REGEX.test(playlistId.trim())
+}
+
+export function formatPlaylistId(playlistId: string): string {
+  return playlistId.trim().replace(/\s+/g, '')
+}
 
 interface PlaylistSelectorProps {
   uploadSettings: UploadSettings
@@ -174,18 +187,26 @@ export function PlaylistSelector({
               <div className="p-4 bg-yt-panel border border-yt-border rounded-lg">
                 <h5 className="text-sm font-medium text-yt-text-primary mb-3">Enter Playlist ID Manually</h5>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    placeholder="Enter Playlist ID..."
-                    className="flex-1 bg-yt-bg text-yt-text-primary px-4 py-2 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
-                    onChange={(e) => {
-                      const playlistId = e.target.value.trim()
-                      if (playlistId) {
-                        onSettingsChange({ selectedPlaylistId: playlistId })
-                        onFetchExistingPlaylistVideos(playlistId)
-                      }
-                    }}
-                  />
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      placeholder="Enter Playlist ID..."
+                      className="w-full bg-yt-bg text-yt-text-primary px-4 py-2 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
+                      onChange={(e) => {
+                        const playlistId = formatPlaylistId(e.target.value)
+                        if (playlistId) {
+                          const isValid = validatePlaylistId(playlistId)
+                          if (isValid) {
+                            onSettingsChange({ selectedPlaylistId: playlistId })
+                            onFetchExistingPlaylistVideos(playlistId)
+                          }
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-yt-text-secondary mt-2">
+                      Playlist IDs start with PL, LL, UL, FL, or OL followed by characters
+                    </p>
+                  </div>
                   <button
                     onClick={() => {
                       const playlistId = 'PLExdYlNNwoiS7KfsjlIy3UHY69r0Qy-e5'

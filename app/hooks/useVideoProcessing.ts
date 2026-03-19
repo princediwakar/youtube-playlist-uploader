@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { MediaFile, UploadSettings } from '@/app/types/video'
 import { generateTitle, getBasename } from '@/app/utils/videoHelpers'
 
 export function useVideoProcessing() {
   const { data: session } = useSession()
+
+  // Ref for aborting requests
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const isProcessingRef = useRef(false)
 
   // Pre-processing status
   const [preProcessingStatus, setPreProcessingStatus] = useState({
@@ -25,6 +29,27 @@ export function useVideoProcessing() {
     addingNavigation: false
   })
 
+  // Cancel any ongoing processing
+  const cancelProcessing = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    isProcessingRef.current = false
+    setAiProcessing(prev => ({
+      ...prev,
+      playlistAnalysis: false,
+      videoAnalysis: false,
+      currentVideoAnalysis: null
+    }))
+    setPreProcessingStatus({
+      isPreProcessing: false,
+      currentStep: '',
+      progress: 0,
+      totalSteps: 0
+    })
+  }, [])
+
   // Generate playlist description
   const generatePlaylistDescription = useCallback(async (videos: MediaFile[], uploadSettings: UploadSettings) => {
     const folderName = videos.length > 0 ? videos[0].folder : ''
@@ -33,6 +58,13 @@ export function useVideoProcessing() {
     // Use AI for playlist description if enabled
     if (uploadSettings.useAiAnalysis) {
       try {
+        // Cancel any existing request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+        }
+        abortControllerRef.current = new AbortController()
+        const signal = abortControllerRef.current.signal
+
         setAiProcessing(prev => ({ ...prev, playlistAnalysis: true }))
 
         const response = await fetch('/api/youtube/analyze-playlist', {
@@ -41,8 +73,11 @@ export function useVideoProcessing() {
           body: JSON.stringify({
             folderName,
             fileNames
-          })
+          }),
+          signal
         })
+
+        if (signal.aborted) return ''
 
         if (response.ok) {
           const { description } = await response.json()
@@ -50,6 +85,10 @@ export function useVideoProcessing() {
           return description
         }
       } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log('Playlist description request cancelled')
+          return ''
+        }
         console.error('Failed to get AI playlist description:', error)
         setAiProcessing(prev => ({ ...prev, playlistAnalysis: false }))
       }
@@ -60,8 +99,18 @@ export function useVideoProcessing() {
   }, [])
 
   // Suggest category based on video content
-  const suggestCategory = useCallback(async (videos: MediaFile[]) => {
+  const suggestCategory = useCallback(async (videos: MediaFile[], signal?: AbortSignal) => {
     try {
+      // Cancel any existing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+      if (signal?.aborted) return null
+      abortControllerRef.current = new AbortController()
+      const combinedSignal = signal 
+        ? AbortSignal.any([signal, abortControllerRef.current.signal])
+        : abortControllerRef.current.signal
+
       setAiProcessing(prev => ({ ...prev, categoryAnalysis: true }))
 
       const fileNames = videos.map(v => v.file.name)
@@ -75,8 +124,11 @@ export function useVideoProcessing() {
           folderName,
           fileNames,
           relativePaths
-        })
+        }),
+        signal: combinedSignal
       })
+
+      if (combinedSignal.aborted) return null
 
       if (response.ok) {
         const { suggestedCategory } = await response.json()
@@ -87,6 +139,10 @@ export function useVideoProcessing() {
       setAiProcessing(prev => ({ ...prev, categoryAnalysis: false }))
       return null
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Category suggestion request cancelled')
+        return null
+      }
       console.error('Failed to get category suggestion:', error)
       setAiProcessing(prev => ({ ...prev, categoryAnalysis: false }))
       return null
@@ -97,7 +153,8 @@ export function useVideoProcessing() {
   const preProcessVideos = useCallback(async (
     videos: MediaFile[],
     uploadSettings: UploadSettings,
-    onVideoProcessed?: (video: MediaFile, metadata: any) => void
+    onVideoProcessed?: (video: MediaFile, metadata: any) => void,
+    signal?: AbortSignal
   ): Promise<Array<{
     video: MediaFile
     metadata: {
@@ -107,6 +164,22 @@ export function useVideoProcessing() {
       category: string
     }
   }>> => {
+    // Check if already aborted
+    if (signal?.aborted) {
+      return []
+    }
+
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    abortControllerRef.current = new AbortController()
+    const combinedSignal = signal 
+      ? AbortSignal.any([signal, abortControllerRef.current.signal])
+      : abortControllerRef.current.signal
+    
+    isProcessingRef.current = true
+
     const totalSteps = videos.length + 2 // +2 for category suggestion and playlist description
     let currentStep = 0
 
@@ -129,14 +202,14 @@ export function useVideoProcessing() {
 
     try {
       // Step 1: Category suggestion (once for all videos)
-      if (uploadSettings.category === '27' && !uploadSettings.useExistingPlaylist) {
+      if (uploadSettings.category === '27' && !uploadSettings.useExistingPlaylist && !combinedSignal.aborted) {
         setPreProcessingStatus(prev => ({
           ...prev,
           currentStep: 'Analyzing content for category suggestion...',
           progress: (currentStep / totalSteps) * 100
         }))
 
-        const suggestedCategory = await suggestCategory(videos)
+        const suggestedCategory = await suggestCategory(videos, combinedSignal)
         if (suggestedCategory && suggestedCategory !== '27') {
           // Note: We don't update uploadSettings here, just use the suggested category for processed videos
           // The parent component should handle updating uploadSettings if needed
@@ -152,7 +225,11 @@ export function useVideoProcessing() {
       }
 
       for (const chunk of chunks) {
+        if (combinedSignal.aborted) break
+
         const chunkPromises = chunk.map(async (video) => {
+          if (combinedSignal.aborted) return null
+          
           setPreProcessingStatus(prev => ({
             ...prev,
             currentStep: `Processing metadata for: ${video.name}`,
@@ -190,8 +267,11 @@ export function useVideoProcessing() {
                   titleFormat: uploadSettings.titleFormat,
                   customTitlePrefix: uploadSettings.customTitlePrefix,
                   customTitleSuffix: uploadSettings.customTitleSuffix
-                })
+                }),
+                signal: combinedSignal
               })
+
+              if (combinedSignal.aborted) return null
 
               if (response.ok) {
                 const aiResult = await response.json()
@@ -230,6 +310,9 @@ export function useVideoProcessing() {
 
             return { video, metadata }
           } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              return null
+            }
             console.error(`Failed to process ${video.name}:`, error)
             // Return fallback metadata
             const fallbackMetadata = {
@@ -251,7 +334,7 @@ export function useVideoProcessing() {
         })
 
         const chunkResults = await Promise.all(chunkPromises)
-        processedVideos.push(...chunkResults)
+        processedVideos.push(...chunkResults.filter(Boolean))
         currentStep += chunk.length
 
         setPreProcessingStatus(prev => ({
@@ -268,9 +351,14 @@ export function useVideoProcessing() {
 
       return processedVideos
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Pre-processing cancelled')
+        return []
+      }
       console.error('Pre-processing failed:', error)
       throw error
     } finally {
+      isProcessingRef.current = false
       setPreProcessingStatus({
         isPreProcessing: false,
         currentStep: '',
@@ -299,6 +387,7 @@ export function useVideoProcessing() {
     preProcessVideos,
     generatePlaylistDescription,
     suggestCategory,
-    setAiProcessingState
+    setAiProcessingState,
+    cancelProcessing
   }
 }

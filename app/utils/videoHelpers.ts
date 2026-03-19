@@ -136,19 +136,6 @@ export function cleanTitleForYoutube(filename: string): string {
   return generateTitle(filename, 'original', '', '')
 }
 
-
-
-
-
-
-
-
-export function extractVideoNumber(title: string): string | null {
-  const match = title.match(/^\d+/)
-  return match ? match[0] : null
-}
-
-
 export function checkForDuplicateVideos(
   videos: MediaFile[],
   existingVideos: Array<{videoId: string, title: string, position: number}>,
