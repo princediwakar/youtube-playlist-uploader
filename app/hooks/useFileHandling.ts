@@ -5,8 +5,6 @@ import { MediaFile } from '@/app/types/media'
 import { formatFileSize } from '@/app/utils/videoHelpers'
 import { analyzeMedia, detectMediaType } from '@/app/utils/mediaHelpers'
 
-const MAX_FILE_SIZE = 256 * 1024 * 1024 // 256 MB (YouTube limit)
-const MAX_BATCH_SIZE = 500 // Maximum files per batch (YouTube allows large playlists)
 
 export interface FileValidationResult {
   valid: boolean
@@ -33,21 +31,9 @@ export function validateFiles(files: File[]): FileValidationResult {
     }
   }
 
-  // Only validate media files
-  if (validFiles.length > MAX_BATCH_SIZE) {
-    errors.push(`Maximum ${MAX_BATCH_SIZE} media files per batch. Selected ${validFiles.length} files.`)
-  }
 
-  const oversizedFiles: string[] = []
-  for (const file of validFiles) {
-    if (file.size > MAX_FILE_SIZE) {
-      oversizedFiles.push(`${file.name} (${formatFileSize(file.size)})`)
-    }
-  }
 
-  if (oversizedFiles.length > 0) {
-    errors.push(`Files exceed 256MB limit: ${oversizedFiles.join(', ')}`)
-  }
+
 
   return {
     valid: errors.length === 0 && validFiles.length > 0,
