@@ -328,25 +328,57 @@ export async function POST(request: NextRequest) {
     
     let errorMessage = 'Upload failed'
     let errorDetails = 'Unknown error'
-    
+
     if (error instanceof Error) {
       errorDetails = error.message
-      
-      // Handle specific YouTube API errors
-      if (error.message.includes('Invalid Credentials') || error.message.includes('unauthorized')) {
-        errorMessage = 'Authentication failed'
-        errorDetails = 'Your YouTube access token has expired. Please sign out and sign in again.'
-      } else if (error.message.includes('quotaExceeded')) {
-        errorMessage = 'Quota exceeded'
-        errorDetails = 'YouTube API quota exceeded. Please try again later.'
-      } else if (error.message.includes('forbidden')) {
-        errorMessage = 'Permission denied'
-        errorDetails = 'Insufficient permissions to upload videos. Please check your YouTube account permissions.'
+
+      // Determine error type by checking multiple possible patterns
+      const isAuthError = error.message.includes('Invalid Credentials') || error.message.includes('unauthorized')
+      let isQuotaError = error.message.includes('quotaExceeded') || error.message.includes('quota')
+      const isForbiddenError = error.message.includes('forbidden')
+
+      // Check error object properties (Google API errors may have code and errors array)
+      if (!isQuotaError && (error as any).code === 403) {
+        // Could be quota error
+        if ((error as any).errors && Array.isArray((error as any).errors)) {
+          const firstErr = (error as any).errors[0]
+          if (firstErr.reason === 'quotaExceeded' || firstErr.message?.includes('quota')) {
+            isQuotaError = true
+          }
+        }
       }
-      
+
       // Log additional error details if available
       if ('response' in error) {
-        console.error('YouTube API response:', (error as any).response?.data)
+        const responseData = (error as any).response?.data
+        console.error('YouTube API response:', responseData)
+
+        // Enhanced quota detection from YouTube API error response
+        if (responseData?.error && !isQuotaError) {
+          const apiError = responseData.error
+          // Check for quota errors in Google API error format
+          if (apiError.code === 403 && apiError.message?.includes('quota')) {
+            isQuotaError = true
+          }
+          if (apiError.errors && Array.isArray(apiError.errors)) {
+            const firstError = apiError.errors[0]
+            if (firstError.reason === 'quotaExceeded' || firstError.message?.includes('quota')) {
+              isQuotaError = true
+            }
+          }
+        }
+      }
+
+      // Set appropriate error message based on detected type
+      if (isAuthError) {
+        errorMessage = 'Authentication failed'
+        errorDetails = 'Your YouTube access token has expired. Please sign out and sign in again.'
+      } else if (isQuotaError) {
+        errorMessage = 'Quota exceeded'
+        errorDetails = 'YouTube API quota exceeded. Please try again later.'
+      } else if (isForbiddenError) {
+        errorMessage = 'Permission denied'
+        errorDetails = 'Insufficient permissions to upload videos. Please check your YouTube account permissions.'
       }
     }
     

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Upload, FolderOpen } from 'lucide-react'
+import { Upload, FolderOpen, AlertTriangle } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
 import { UploadSettings, isVideoFile } from '@/app/types/video'
@@ -54,11 +54,13 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     quotaWarning,
     pauseUpload,
     resumeUpload,
-    cancelUpload
+    cancelUpload,
+    clearQuotaWarning
   } = useVideoUpload()
 
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<string | null>(null)
   const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
     playlistName: '',
     privacyStatus: 'private',
@@ -124,32 +126,30 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const handleOptimizedUpload = async () => {
     if (!session) return
 
+    // Clear any previous error states
+    setAuthError(null)
+    clearQuotaWarning?.()
+
     try {
       // Keep uploading in batches until all pending videos are processed
+      // Use a local mutable queue to avoid stale closure issues during the async loop
       let batchNumber = 0
-      let hasMoreVideos = true
+      let pendingQueue = videos.filter(v => v.status === 'pending')
       let playlistId: string | null = null
       let positionOffset = 0
+      let activeExistingVideos: Array<{videoId: string, title: string, position: number}> = []
+      let hasAuthError = false
+      let hasQuotaError = false
 
-      while (hasMoreVideos) {
+      while (pendingQueue.length > 0) {
         batchNumber++
         console.log(`Starting batch ${batchNumber}...`)
 
-        // Get current pending videos (in case state changed)
-        const currentVideos = videos.filter(v => v.status === 'pending')
-        
-        if (currentVideos.length === 0) {
-          console.log('No more pending videos to upload')
-          break
-        }
-
-        const initialVideosToProcess = currentVideos.slice(0, uploadSettings.maxVideos)
-        const remainingCount = currentVideos.length - initialVideosToProcess.length
+        const initialVideosToProcess = pendingQueue.slice(0, uploadSettings.maxVideos)
+        const remainingCount = pendingQueue.length - initialVideosToProcess.length
         console.log(`Batch ${batchNumber}: ${initialVideosToProcess.length} videos (${remainingCount} remaining)`)
 
         // Phase 1: Playlist management & fetch existing videos
-        let existingVideos: Array<{videoId: string, title: string, position: number}> = []
-
         if (uploadSettings.uploadMode === 'playlist') {
           if (uploadSettings.useExistingPlaylist) {
             if (!uploadSettings.selectedPlaylistId) {
@@ -158,18 +158,24 @@ export default function UploadScreen({ session }: UploadScreenProps) {
             playlistId = uploadSettings.selectedPlaylistId
             setCurrentPlaylistId(playlistId)
 
-            // Fetch existing videos for duplicate detection (force refresh for up-to-date data)
-            let fetchedVideos: any[] = []
-            try {
-              fetchedVideos = await fetchExistingPlaylistVideos(playlistId, true) || []
-            } catch (fetchError) {
-              console.error('Failed to fetch existing playlist videos:', fetchError)
-              fetchedVideos = []
+            // Only fetch from API on the first batch to get the initial baseline state
+            if (batchNumber === 1) {
+              let fetchedVideos: any[] = []
+              try {
+                fetchedVideos = await fetchExistingPlaylistVideos(playlistId, true) || []
+              } catch (fetchError) {
+                console.error('Failed to fetch existing playlist videos:', fetchError)
+                fetchedVideos = []
+              }
+              activeExistingVideos = fetchedVideos.filter(
+                v => v && typeof v.videoId === 'string' && typeof v.title === 'string' && typeof v.position === 'number'
+              )
+              // Ensure initial array is sorted by position
+              activeExistingVideos.sort((a, b) => a.position - b.position)
+              console.log(`Batch ${batchNumber}: Fetched ${activeExistingVideos.length} existing videos from playlist`)
+            } else {
+              console.log(`Batch ${batchNumber}: Using ${activeExistingVideos.length} locally tracked existing videos from playlist`)
             }
-            existingVideos = fetchedVideos.filter(
-              v => v && typeof v.videoId === 'string' && typeof v.title === 'string'
-            )
-            console.log(`Batch ${batchNumber}: Fetched ${existingVideos.length} existing videos from playlist`)
           } else {
             // Only create playlist once (first batch)
             if (batchNumber === 1) {
@@ -197,21 +203,11 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               const { playlistId: newPlaylistId } = await playlistResponse.json()
               playlistId = newPlaylistId
               setCurrentPlaylistId(playlistId)
-            }
-            
-            // For subsequent batches, fetch existing videos for position calculation (force refresh)
-            if (playlistId) {
-              let fetchedVideos: any[] = []
-              try {
-                fetchedVideos = await fetchExistingPlaylistVideos(playlistId, true) || []
-              } catch (fetchError) {
-                console.error('Failed to fetch existing playlist videos:', fetchError)
-                fetchedVideos = []
-              }
-              existingVideos = fetchedVideos.filter(
-                v => v && typeof v.videoId === 'string' && typeof v.title === 'string'
-              )
-              console.log(`Batch ${batchNumber}: Found ${existingVideos.length} existing videos in playlist`)
+              
+              // New playlist means no existing videos initially
+              activeExistingVideos = []
+            } else {
+              console.log(`Batch ${batchNumber}: Using ${activeExistingVideos.length} locally tracked existing videos for new playlist`)
             }
           }
         }
@@ -224,7 +220,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         
         // Build a Set of existing titles for O(1) lookup (normalized: lowercase, trimmed)
         const existingTitles = new Set<string>()
-        for (const existing of existingVideos) {
+        for (const existing of activeExistingVideos) {
           if (existing?.title && typeof existing.title === 'string') {
             existingTitles.add(existing.title.trim().toLowerCase())
           }
@@ -265,11 +261,11 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         // Early exit: if no videos to process after duplicate filtering, skip to next batch
         if (videosToProcess.length === 0) {
           console.log(`Batch ${batchNumber}: All videos are duplicates, skipping`)
-          // Mark all pending videos as completed (they're all duplicates)
+          // Mark these specific videos as completed since they are duplicates
           setVideos(prev => prev.map(v => 
-            v.status === 'pending' ? { ...v, status: 'completed', progress: 100 } : v
+            initialVideosToProcess.some(iv => iv.file === v.file) ? { ...v, status: 'completed', progress: 100 } : v
           ))
-          hasMoreVideos = videos.filter(v => v.status === 'pending').length > 0
+          pendingQueue = pendingQueue.slice(initialVideosToProcess.length)
           continue
         }
         
@@ -278,7 +274,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
             // Use actual pre-processed titles for position calculation (only non-duplicates)
             const allPositions = calculateInsertionPositions(
               videosToProcess.map(pv => pv.video), 
-              existingVideos, 
+              activeExistingVideos, 
               uploadSettings.titleFormat, 
               uploadSettings.customTitlePrefix, 
               uploadSettings.customTitleSuffix, 
@@ -290,7 +286,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               positionMap.set(pv.video.path, allPositions[index])
             })
             positions = videosToProcess.map(pv => positionMap.get(pv.video.path) || 0)
-            console.log(`Batch ${batchNumber}: Calculated positions for ${videosToProcess.length} videos (existing: ${existingVideos.length})`, positions)
+            console.log(`Batch ${batchNumber}: Calculated positions for ${videosToProcess.length} videos (existing: ${activeExistingVideos.length})`, positions)
           } else {
             // New playlist: positions continue from previous batch
             positions = videosToProcess.map((_, index) => positionOffset + index)
@@ -338,22 +334,28 @@ export default function UploadScreen({ session }: UploadScreenProps) {
 
             // Update existingPlaylistVideos to prevent false duplicates in subsequent batches
             if (playlistId && uploadSettings.uploadMode === 'playlist') {
+              const queueItem = uploadQueue.find(item => item.video.file === video.file)
+              const position = queueItem?.position ?? activeExistingVideos.length
+              
+              const newVideoRecord = { videoId: result.videoId, title: video.name, position }
+              
+              // Update local tracking array for the next batch loop
+              activeExistingVideos.push(newVideoRecord)
+              // Keep array sorted by position for consistent calculations in next batch
+              activeExistingVideos.sort((a, b) => a.position - b.position)
+
+              // Update React UI state (sorted by position)
               setExistingPlaylistVideos(prev => {
-                if (!prev) return prev
-                const queueItem = uploadQueue.find(item => item.video.file === video.file)
-                const position = queueItem?.position ?? prev.length
-                return [
-                  ...prev,
-                  { videoId: result.videoId, title: video.name, position }
-                ]
+                if (!prev) return [newVideoRecord]
+                const updated = [...prev, newVideoRecord]
+                updated.sort((a, b) => a.position - b.position)
+                return updated
               })
             }
 
-            // Invalidate playlist videos cache when video is successfully uploaded to playlist
-            if (playlistId) {
-              clearPlaylistVideosCache(playlistId)
-              console.log('Playlist videos cache invalidated for playlist:', playlistId)
-            }
+            // Cache invalidation is deferred until all uploads complete to avoid
+            // triggering API requests with stale data during multi-batch uploads
+            // The cache will be cleared after all batches finish (see line 381-386)
 
             // Add navigation links immediately if enabled
             if (uploadSettings.addPlaylistNavigation && result.videoId && playlistId) {
@@ -367,30 +369,52 @@ export default function UploadScreen({ session }: UploadScreenProps) {
           // onVideoError callback
           (video, error) => {
             console.error('Upload error for video:', video.name, error)
+
+            const errorMessage = error instanceof Error ? error.message : 'Upload failed'
+
+            // Check for authentication errors
+            if (errorMessage.includes('access token has expired') || errorMessage.includes('unauthorized') || errorMessage.includes('Invalid Credentials')) {
+              console.log('Authentication error detected, cancelling uploads')
+              setAuthError(errorMessage)
+              hasAuthError = true
+              cancelUpload()
+            }
+
+            // Check for quota errors
+            if (errorMessage.includes('quota') || errorMessage.includes('QUOTA') || errorMessage.includes('quotaExceeded')) {
+              console.log('Quota error detected, cancelling uploads')
+              hasQuotaError = true
+              cancelUpload()
+            }
+
             setVideos(prev => prev.map(v =>
               v.file === video.file
                 ? {
                     ...v,
                     status: 'error',
                     progress: 0,
-                    error: error instanceof Error ? error.message : 'Upload failed'
+                    error: errorMessage
                   }
                 : v
             ))
           }
         )
 
-        // Check if there are more pending videos for the next batch
-        const remainingPending = videos.filter(v => v.status === 'pending')
-        hasMoreVideos = remainingPending.length > 0
+        // Check for authentication or quota error to break the batch loop
+        if (hasAuthError || hasQuotaError) {
+          break
+        }
+
+        // Advance the queue
+        pendingQueue = pendingQueue.slice(initialVideosToProcess.length)
         
-        if (hasMoreVideos) {
-          console.log(`Batch ${batchNumber} complete. ${remainingPending.length} videos remaining.`)
+        if (pendingQueue.length > 0) {
+          console.log(`Batch ${batchNumber} complete. ${pendingQueue.length} videos remaining.`)
         }
       }
 
-      // Invalidate playlists cache after all uploads complete (only for new playlists)
-      if (playlistId && !uploadSettings.useExistingPlaylist) {
+      // Invalidate playlists cache after all uploads complete
+      if (playlistId) {
         clearPlaylistCache()
         clearPlaylistVideosCache(playlistId)
         console.log('Playlists cache invalidated after all uploads complete')
@@ -407,7 +431,46 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const totalVideos = videos.length;
 
   return (
-    <div className="grid lg:grid-cols-12 gap-8 items-start">
+    <>
+      {authError && (
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="mr-3 text-red-500" size={20} />
+              <div>
+                <p className="text-red-300 font-medium">{authError}</p>
+                <p className="text-red-400 text-sm mt-1">Please sign out and sign in again to refresh your access token.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setAuthError(null)}
+              className="text-red-300 hover:text-red-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      {quotaWarning && (
+        <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="mr-3 text-yellow-500" size={20} />
+              <div>
+                <p className="text-yellow-300 font-medium">YouTube API Quota Exceeded</p>
+                <p className="text-yellow-400 text-sm mt-1">{quotaWarning}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => clearQuotaWarning()}
+              className="text-yellow-300 hover:text-yellow-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="grid lg:grid-cols-12 gap-8 items-start">
 
       {/* Left Column: Intake & Configuration */}
       <div className="lg:col-span-8 flex flex-col gap-8">
@@ -590,5 +653,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         />
       </div>
     </div>
-  )
+  </>
+)
 }

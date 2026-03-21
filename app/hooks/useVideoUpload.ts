@@ -69,7 +69,7 @@ export function useVideoUpload() {
     setUploadQueue([])
     setCurrentUpload(null)
     setUploadStats(null)
-    setQuotaWarning(null)
+    // Note: quotaWarning is NOT cleared here to preserve quota error messages
   }, [])
 
   // Retry a failed upload with exponential backoff
@@ -94,7 +94,7 @@ export function useVideoUpload() {
         // Don't retry on certain errors
         if (error instanceof Error) {
           // Quota errors - don't retry
-          if (error.message.includes('quota') || error.message.includes('QUOTA_EXCEEDED')) {
+          if (error.message.includes('quota') || error.message.includes('QUOTA_EXCEEDED') || error.message.includes('quotaExceeded')) {
             throw error
           }
           // Auth errors - don't retry
@@ -312,8 +312,9 @@ export function useVideoUpload() {
             const errorMessage = error instanceof Error ? error.message : 'Upload failed'
 
             // Check for quota errors
-            if (errorMessage.includes('quota') || errorMessage.includes('QUOTA')) {
-              setQuotaWarning('YouTube API quota exceeded. Consider reducing batch size.')
+            const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('QUOTA') || errorMessage.includes('quotaExceeded')
+            if (isQuotaError) {
+              setQuotaWarning('YouTube API daily quota exceeded. Please try again tomorrow or reduce batch size.')
               console.warn('Quota warning:', errorMessage)
             }
 
@@ -321,8 +322,10 @@ export function useVideoUpload() {
               onVideoError(video, error as Error)
             }
 
-            // Add to failed items for retry
-            failedItems.push({ ...item, retryCount: retryCount + 1 })
+            // Add to failed items for retry (skip quota errors as they are unrecoverable)
+            if (!isQuotaError) {
+              failedItems.push({ ...item, retryCount: retryCount + 1 })
+            }
 
             return null
           }
