@@ -94,6 +94,117 @@ export class YouTubeApiService {
     }
   }
 
+  async uploadVideoStream(
+    fileStream: ReadableStream<Uint8Array>,
+    fileSize: number,
+    fileType: string,
+    metadata: VideoMetadata
+  ): Promise<UploadResponse> {
+    const accessToken = (await this.oauth2Client.getAccessToken()).token
+    if (!accessToken) {
+      throw new Error('No access token available')
+    }
+
+    // Step 1: Initiate resumable upload session
+    const requestBody = {
+      snippet: {
+        title: metadata.title,
+        description: metadata.description,
+        tags: metadata.tags,
+        categoryId: metadata.categoryId,
+      },
+      status: {
+        privacyStatus: metadata.privacyStatus,
+        selfDeclaredMadeForKids: metadata.madeForKids,
+      },
+    }
+
+    const initResponse = await fetch(
+      'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Upload-Content-Type': fileType || 'video/*',
+          'X-Upload-Content-Length': String(fileSize),
+        },
+        body: JSON.stringify(requestBody),
+      }
+    )
+
+    if (!initResponse.ok) {
+      let errorMessage = `Failed to initiate upload: HTTP ${initResponse.status}`
+      try {
+        const errorBody = await initResponse.json()
+        const apiError = errorBody?.error
+        if (apiError?.message) errorMessage = apiError.message
+      } catch { /* ignore parse errors */ }
+      throw Object.assign(new Error(errorMessage), { code: initResponse.status })
+    }
+
+    const uploadUrl = initResponse.headers.get('Location')
+    if (!uploadUrl) {
+      throw new Error('No upload URL returned from YouTube')
+    }
+
+    // Step 2: Stream chunks to the resumable URL
+    const CHUNK_SIZE = 16 * 1024 * 1024
+    const reader = fileStream.getReader()
+    let bytesUploaded = 0
+    const chunks: Uint8Array[] = []
+    let currentChunkSize = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (value && value.length > 0) {
+          chunks.push(value)
+          currentChunkSize += value.length
+        }
+
+        // Upload when chunk is full or stream is done
+        if (currentChunkSize >= CHUNK_SIZE || (done && currentChunkSize > 0)) {
+          const chunkBuffer = Buffer.concat(chunks.map(c => Buffer.from(c)))
+          const rangeStart = bytesUploaded
+          const rangeEnd = bytesUploaded + chunkBuffer.length - 1
+
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${fileSize}`,
+              'Content-Length': String(chunkBuffer.length),
+            },
+            body: chunkBuffer,
+          })
+
+          if (uploadResponse.ok) {
+            const result = await uploadResponse.json()
+            const videoId = result.id
+            if (!videoId) throw new Error('No video ID in YouTube response')
+            return { videoId, url: `https://www.youtube.com/watch?v=${videoId}` }
+          }
+
+          if (uploadResponse.status !== 308) {
+            const errorBody = await uploadResponse.text().catch(() => '')
+            throw new Error(`YouTube upload chunk failed: HTTP ${uploadResponse.status} - ${errorBody}`)
+          }
+
+          bytesUploaded += chunkBuffer.length
+          chunks.length = 0
+          currentChunkSize = 0
+        }
+
+        if (done) break
+      }
+
+      throw new Error('Upload ended without completion response from YouTube')
+    } finally {
+      try { reader.releaseLock() } catch { /* already released */ }
+    }
+  }
+
   async addVideoToPlaylist(videoId: string, playlistId: string, position?: number): Promise<void> {
     await this.youtube.playlistItems.insert({
       part: ['snippet'],

@@ -257,15 +257,59 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      // Video file, use as-is
-      uploadBuffer = Buffer.from(await videoFile.arrayBuffer())
+      // Video file — stream directly to YouTube without buffering in memory
+      console.log('Starting streaming upload for video:', uploadFilename)
+
+      try {
+        const uploadMetadata = {
+          title: finalTitle,
+          description: description,
+          tags: tags,
+          categoryId: finalCategory,
+          privacyStatus: privacyStatus as 'private' | 'public' | 'unlisted',
+          madeForKids,
+          isShort: isShort && duration <= 60 && aspectRatio <= 1.0
+        }
+
+        const uploadResponse = await youtubeApi.uploadVideoStream(
+          videoFile.stream(),
+          videoFile.size,
+          videoFile.type,
+          uploadMetadata
+        )
+
+        const videoId = uploadResponse.videoId
+
+        // Add to playlist if specified (only for playlist mode)
+        if (uploadMode === 'playlist' && playlistId && videoId) {
+          try {
+            const positionNum = position?.trim() ? parseInt(position, 10) : undefined
+            await youtubeApi.addVideoToPlaylist(
+              videoId,
+              playlistId,
+              Number.isNaN(positionNum) ? undefined : positionNum
+            )
+            console.log(`Video ${videoId} added to playlist ${playlistId}`)
+          } catch (playlistError) {
+            console.error('Error adding video to playlist:', playlistError)
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          videoId: videoId,
+          url: `https://www.youtube.com/watch?v=${videoId}`
+        })
+      } catch (error) {
+        throw error
+      }
     }
 
-    // Convert File to buffer for upload
+    // Audio path — upload converted buffer
     const buffer = uploadBuffer
 
     try {
-      console.log('Preparing YouTube upload with:', {
+      console.log('Preparing YouTube upload for audio:', {
         title: finalTitle,
         descriptionLength: description?.length,
         tagsCount: tags?.length,
@@ -274,7 +318,6 @@ export async function POST(request: NextRequest) {
         madeForKids
       })
 
-      // Upload video to YouTube using service
       const uploadResponse = await youtubeApi.uploadVideo(
         buffer,
         uploadFilename,
@@ -291,7 +334,6 @@ export async function POST(request: NextRequest) {
 
       const videoId = uploadResponse.videoId
 
-      // Add to playlist if specified (only for playlist mode)
       if (uploadMode === 'playlist' && playlistId && videoId) {
         try {
           const positionNum = position?.trim() ? parseInt(position, 10) : undefined
@@ -300,15 +342,9 @@ export async function POST(request: NextRequest) {
             playlistId,
             Number.isNaN(positionNum) ? undefined : positionNum
           )
-          console.log(`Video ${videoId} added to playlist ${playlistId} at position ${positionNum ?? 'end'}`)
+          console.log(`Video ${videoId} added to playlist ${playlistId}`)
         } catch (playlistError) {
-          console.error('Error adding video to playlist:', {
-            videoId,
-            playlistId,
-            error: playlistError instanceof Error ? playlistError.message : 'Unknown error'
-          })
-          // Note: Video uploaded successfully, just not added to playlist
-          // The video is still accessible on YouTube directly
+          console.error('Error adding video to playlist:', playlistError)
         }
       }
 
@@ -319,7 +355,6 @@ export async function POST(request: NextRequest) {
       })
 
     } catch (error) {
-      // Error handling will be caught by outer try-catch
       throw error
     }
 

@@ -105,6 +105,10 @@ export function useVideoUpload() {
           if (error.name === 'AbortError') {
             throw error
           }
+          // Payload too large - don't retry (will never succeed)
+          if (error.message.includes('413') || error.message.includes('too large') || error.message.includes('Request Entity')) {
+            throw error
+          }
         }
       }
     }
@@ -224,8 +228,16 @@ export function useVideoUpload() {
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.details || 'Upload failed')
+        let errorMessage = `Upload failed (HTTP ${response.status})`
+        try {
+          const error = await response.json()
+          errorMessage = error.details || error.error || errorMessage
+        } catch {
+          // Response body is not JSON (e.g., Vercel's plain-text 413)
+          const text = await response.text().catch(() => '')
+          if (text) errorMessage = text
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
