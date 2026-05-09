@@ -38,9 +38,11 @@ export function useVideoProcessing() {
     isProcessingRef.current = false
     setAiProcessing(prev => ({
       ...prev,
+      categoryAnalysis: false,
       playlistAnalysis: false,
       videoAnalysis: false,
-      currentVideoAnalysis: null
+      currentVideoAnalysis: null,
+      addingNavigation: false
     }))
     setPreProcessingStatus({
       isPreProcessing: false,
@@ -101,15 +103,8 @@ export function useVideoProcessing() {
   // Suggest category based on video content
   const suggestCategory = useCallback(async (videos: MediaFile[], signal?: AbortSignal) => {
     try {
-      // Cancel any existing request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
       if (signal?.aborted) return null
-      abortControllerRef.current = new AbortController()
-      const combinedSignal = signal 
-        ? AbortSignal.any([signal, abortControllerRef.current.signal])
-        : abortControllerRef.current.signal
+      const combinedSignal = signal
 
       setAiProcessing(prev => ({ ...prev, categoryAnalysis: true }))
 
@@ -127,8 +122,6 @@ export function useVideoProcessing() {
         }),
         signal: combinedSignal
       })
-
-      if (combinedSignal.aborted) return null
 
       if (response.ok) {
         const { suggestedCategory } = await response.json()
@@ -202,7 +195,7 @@ export function useVideoProcessing() {
 
     try {
       // Step 1: Category suggestion (once for all videos)
-      if (uploadSettings.category === '27' && !uploadSettings.useExistingPlaylist && !combinedSignal.aborted) {
+      if (uploadSettings.category === '27' && !combinedSignal.aborted) {
         setPreProcessingStatus(prev => ({
           ...prev,
           currentStep: 'Analyzing content for category suggestion...',
@@ -210,10 +203,7 @@ export function useVideoProcessing() {
         }))
 
         const suggestedCategory = await suggestCategory(videos, combinedSignal)
-        if (suggestedCategory && suggestedCategory !== '27') {
-          // Note: We don't update uploadSettings here, just use the suggested category for processed videos
-          // The parent component should handle updating uploadSettings if needed
-        }
+        var suggestedCat = (suggestedCategory && suggestedCategory !== '27') ? suggestedCategory : null
         currentStep++
       }
 
@@ -279,7 +269,7 @@ export function useVideoProcessing() {
                   title: aiResult.title,
                   description: aiResult.description,
                   tags: aiResult.tags,
-                  category: video.mediaType === 'audio' ? uploadSettings.audioCategory : aiResult.category
+                  category: video.mediaType === 'audio' ? (aiResult.category && aiResult.category !== '10' ? aiResult.category : uploadSettings.audioCategory) : aiResult.category
                 }
               } else {
                 throw new Error('AI analysis failed')
@@ -293,7 +283,7 @@ export function useVideoProcessing() {
             } else {
               // AI analysis disabled - provide empty description, empty tags, and user-selected category
               const tags = []
-              let finalCategory = video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
+              let finalCategory = video.mediaType === 'audio' ? uploadSettings.audioCategory : (suggestedCat || uploadSettings.category)
 
               metadata = {
                 title: generateTitle(getBasename(video.file.name), uploadSettings.titleFormat, uploadSettings.customTitlePrefix, uploadSettings.customTitleSuffix),
@@ -367,6 +357,7 @@ export function useVideoProcessing() {
       })
       setAiProcessing(prev => ({
         ...prev,
+        categoryAnalysis: false,
         videoAnalysis: false,
         currentVideoAnalysis: null
       }))
