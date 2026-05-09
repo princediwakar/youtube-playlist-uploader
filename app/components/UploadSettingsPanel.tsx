@@ -2,54 +2,34 @@
 
 import { ChevronDown, Check, Database, Sparkles } from 'lucide-react'
 import { PlaylistSelector } from './PlaylistSelector'
-import { UploadSettings, PlaylistItem, MediaFile, isVideoFile, isAudioFile } from '@/app/types/video'
+import { isVideoFile, isAudioFile } from '@/app/types/video'
+import { useUploadContext } from '@/app/hooks/UploadContext'
 
-interface UploadSettingsPanelProps {
-  videos: MediaFile[]
-  uploadSettings: UploadSettings
-  onSettingsChange: (settings: Partial<UploadSettings>) => void
-  availablePlaylists: PlaylistItem[]
-  loadingPlaylists: boolean
-  existingPlaylistVideos: any[]
-  showAdvancedSettings: boolean
-  onToggleAdvancedSettings: () => void
-  onFetchUserPlaylists: (forceRefresh?: boolean) => void
-  onFetchExistingPlaylistVideos: (playlistId: string) => void
-  onClearPlaylistCache: () => void
-  onClearPlaylistVideosCache: () => void
-  onSetExistingPlaylistVideos: (videos: any[]) => void
-  onUpload: () => void
-  isUploading: boolean
-  totalVideos: number
-  totalQueued: number
-}
+export function UploadSettingsPanel() {
+  const {
+    videos,
+    uploadSettings,
+    setUploadSettings,
+    availablePlaylists,
+    existingPlaylistVideos,
+    showAdvancedSettings,
+    setShowAdvancedSettings,
+    isUploading,
+    handleOptimizedUpload,
+    clearPlaylistCache,
+    clearPlaylistVideosCache,
+    setExistingPlaylistVideos
+  } = useUploadContext()
 
-export function UploadSettingsPanel({
-  videos,
-  uploadSettings,
-  onSettingsChange,
-  availablePlaylists,
-  loadingPlaylists,
-  existingPlaylistVideos,
-  showAdvancedSettings,
-  onToggleAdvancedSettings,
-  onFetchUserPlaylists,
-  onFetchExistingPlaylistVideos,
-  onClearPlaylistCache,
-  onClearPlaylistVideosCache,
-  onSetExistingPlaylistVideos,
-  onUpload,
-  isUploading,
-  totalVideos,
-  totalQueued
-}: UploadSettingsPanelProps) {
-  // Only render if there are videos
   if (videos.length === 0) {
     return null
   }
 
   const audioFiles = videos.filter(v => isAudioFile(v))
   const hasAudioFiles = audioFiles.length > 0
+  const pendingVideos = videos.filter(v => v.status === 'pending')
+  const totalVideos = videos.length
+  const totalQueued = Math.min(pendingVideos.length, uploadSettings.maxVideos)
 
   return (
     <div className="panel">
@@ -76,7 +56,7 @@ export function UploadSettingsPanel({
                 name="uploadMode"
                 value="playlist"
                 checked={uploadSettings.uploadMode === 'playlist'}
-                onChange={(e) => onSettingsChange({ uploadMode: e.target.value as 'playlist' | 'individual' })}
+                onChange={(e) => setUploadSettings(prev => ({ ...prev, uploadMode: e.target.value as 'playlist' | 'individual' }))}
                 className="sr-only"
               />
               <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${uploadSettings.uploadMode === 'playlist' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
@@ -94,7 +74,7 @@ export function UploadSettingsPanel({
                 name="uploadMode"
                 value="individual"
                 checked={uploadSettings.uploadMode === 'individual'}
-                onChange={(e) => onSettingsChange({ uploadMode: e.target.value as 'playlist' | 'individual' })}
+                onChange={(e) => setUploadSettings(prev => ({ ...prev, uploadMode: e.target.value as 'playlist' | 'individual' }))}
                 className="sr-only"
               />
               <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${uploadSettings.uploadMode === 'individual' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
@@ -111,18 +91,7 @@ export function UploadSettingsPanel({
         </div>
       </div>
 
-      <PlaylistSelector
-        uploadSettings={uploadSettings}
-        onSettingsChange={onSettingsChange}
-        availablePlaylists={availablePlaylists}
-        loadingPlaylists={loadingPlaylists}
-        existingPlaylistVideos={existingPlaylistVideos}
-        onFetchUserPlaylists={onFetchUserPlaylists}
-        onFetchExistingPlaylistVideos={onFetchExistingPlaylistVideos}
-        onClearPlaylistCache={onClearPlaylistCache}
-        onClearPlaylistVideosCache={onClearPlaylistVideosCache}
-        onSetExistingPlaylistVideos={onSetExistingPlaylistVideos}
-      />
+      <PlaylistSelector />
 
       <div className="grid md:grid-cols-3 gap-6 mb-6">
         {/* Privacy Setting */}
@@ -133,9 +102,9 @@ export function UploadSettingsPanel({
           <div className="relative">
             <select
               value={uploadSettings.privacyStatus}
-              onChange={(e) => onSettingsChange({
-                privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
-              })}
+              onChange={(e) => setUploadSettings(prev => ({
+                ...prev, privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
+              }))}
               className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
             >
               <option value="private">Private</option>
@@ -158,9 +127,9 @@ export function UploadSettingsPanel({
             min="1"
             max="50"
             value={uploadSettings.maxVideos}
-            onChange={(e) => onSettingsChange({
-              maxVideos: parseInt(e.target.value) || 10
-            })}
+            onChange={(e) => setUploadSettings(prev => ({
+              ...prev, maxVideos: parseInt(e.target.value) || 10
+            }))}
             className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none"
           />
         </div>
@@ -173,7 +142,7 @@ export function UploadSettingsPanel({
           <div className="relative">
             <select
               value={uploadSettings.contentType}
-              onChange={(e) => onSettingsChange({ contentType: e.target.value })}
+              onChange={(e) => setUploadSettings(prev => ({ ...prev, contentType: e.target.value }))}
               className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
             >
               <option value="auto">Auto Detect</option>
@@ -194,7 +163,7 @@ export function UploadSettingsPanel({
       <div className="mt-8 pt-6 border-t border-yt-border">
         <button
           type="button"
-          onClick={onToggleAdvancedSettings}
+          onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
           className="flex items-center text-sm font-medium text-yt-text-primary hover:text-yt-blue transition-colors group"
         >
           <ChevronDown
@@ -212,9 +181,9 @@ export function UploadSettingsPanel({
                 <input
                   type="checkbox"
                   checked={uploadSettings.madeForKids}
-                  onChange={(e) => onSettingsChange({
-                    madeForKids: e.target.checked
-                  })}
+                  onChange={(e) => setUploadSettings(prev => ({
+                    ...prev, madeForKids: e.target.checked
+                  }))}
                   className="sr-only"
                 />
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.madeForKids ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
@@ -233,9 +202,9 @@ export function UploadSettingsPanel({
                 <input
                   type="checkbox"
                   checked={uploadSettings.useAiAnalysis}
-                  onChange={(e) => onSettingsChange({
-                    useAiAnalysis: e.target.checked
-                  })}
+                  onChange={(e) => setUploadSettings(prev => ({
+                    ...prev, useAiAnalysis: e.target.checked
+                  }))}
                   className="sr-only"
                 />
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.useAiAnalysis ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
@@ -257,9 +226,9 @@ export function UploadSettingsPanel({
                 <input
                   type="checkbox"
                   checked={uploadSettings.addPlaylistNavigation}
-                  onChange={(e) => onSettingsChange({
-                    addPlaylistNavigation: e.target.checked
-                  })}
+                  onChange={(e) => setUploadSettings(prev => ({
+                    ...prev, addPlaylistNavigation: e.target.checked
+                  }))}
                   className="sr-only"
                 />
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.addPlaylistNavigation ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
@@ -272,7 +241,7 @@ export function UploadSettingsPanel({
               </div>
             </div>
 
-            {/* Audio Settings (only shown when audio files are present) */}
+            {/* Audio Settings */}
             {hasAudioFiles && (
               <>
                 <div className="flex items-start space-x-3 group">
@@ -280,9 +249,9 @@ export function UploadSettingsPanel({
                     <input
                       type="checkbox"
                       checked={uploadSettings.generateAudioFrames}
-                      onChange={(e) => onSettingsChange({
-                        generateAudioFrames: e.target.checked
-                      })}
+                      onChange={(e) => setUploadSettings(prev => ({
+                        ...prev, generateAudioFrames: e.target.checked
+                      }))}
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.generateAudioFrames ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
@@ -301,7 +270,7 @@ export function UploadSettingsPanel({
                     <div className="relative">
                       <select
                         value={uploadSettings.audioCategory}
-                        onChange={(e) => onSettingsChange({ audioCategory: e.target.value })}
+                        onChange={(e) => setUploadSettings(prev => ({ ...prev, audioCategory: e.target.value }))}
                         className="w-full px-3 py-2 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer text-sm"
                       >
                         <option value="10">10: Music</option>
@@ -335,9 +304,9 @@ export function UploadSettingsPanel({
 
               <button
                 onClick={() => {
-                  onClearPlaylistCache()
-                  onClearPlaylistVideosCache()
-                  onSetExistingPlaylistVideos([])
+                  clearPlaylistCache()
+                  clearPlaylistVideosCache()
+                  setExistingPlaylistVideos([])
                   alert('Cache cleared.')
                 }}
                 className="text-sm font-medium text-yt-red hover:text-red-400 mt-3 sm:mt-0 transition-colors"
@@ -356,7 +325,7 @@ export function UploadSettingsPanel({
                 <div className="relative">
                   <select
                     value={uploadSettings.category}
-                    onChange={(e) => onSettingsChange({ category: e.target.value })}
+                    onChange={(e) => setUploadSettings(prev => ({ ...prev, category: e.target.value }))}
                     className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
                   >
                     <option value="27">27: Education</option>
@@ -384,9 +353,9 @@ export function UploadSettingsPanel({
                 <div className="relative">
                   <select
                     value={uploadSettings.titleFormat}
-                    onChange={(e) => onSettingsChange({
-                      titleFormat: e.target.value as 'original' | 'cleaned' | 'custom'
-                    })}
+                    onChange={(e) => setUploadSettings(prev => ({
+                      ...prev, titleFormat: e.target.value as 'original' | 'cleaned' | 'custom'
+                    }))}
                     className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
                   >
                     <option value="original">Original Filename</option>
@@ -408,9 +377,9 @@ export function UploadSettingsPanel({
                     <input
                       type="text"
                       value={uploadSettings.customTitlePrefix}
-                      onChange={(e) => onSettingsChange({
-                        customTitlePrefix: e.target.value
-                      })}
+                      onChange={(e) => setUploadSettings(prev => ({
+                        ...prev, customTitlePrefix: e.target.value
+                      }))}
                       className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
                       placeholder="Prefix: "
                     />
@@ -422,9 +391,9 @@ export function UploadSettingsPanel({
                     <input
                       type="text"
                       value={uploadSettings.customTitleSuffix}
-                      onChange={(e) => onSettingsChange({
-                        customTitleSuffix: e.target.value
-                      })}
+                      onChange={(e) => setUploadSettings(prev => ({
+                        ...prev, customTitleSuffix: e.target.value
+                      }))}
                       className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
                       placeholder=" - Suffix"
                     />
@@ -443,7 +412,7 @@ export function UploadSettingsPanel({
         </div>
 
         <button
-          onClick={onUpload}
+          onClick={handleOptimizedUpload}
           disabled={
             isUploading ||
             (uploadSettings.uploadMode === 'playlist' && (

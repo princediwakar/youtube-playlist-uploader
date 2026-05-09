@@ -52,7 +52,9 @@ export const authOptions: NextAuthOptions = {
   }
 }
 
-async function refreshAccessToken(token: any) {
+import type { JWT } from 'next-auth/jwt'
+
+async function refreshAccessToken(token: JWT) {
   try {
     const url = 'https://oauth2.googleapis.com/token'
 

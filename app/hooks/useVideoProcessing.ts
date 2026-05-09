@@ -146,7 +146,12 @@ export function useVideoProcessing() {
   const preProcessVideos = useCallback(async (
     videos: MediaFile[],
     uploadSettings: UploadSettings,
-    onVideoProcessed?: (video: MediaFile, metadata: any) => void,
+    onVideoProcessed?: (video: MediaFile, metadata: {
+      title: string
+      description: string
+      tags: string[]
+      category: string
+    }) => void,
     signal?: AbortSignal
   ): Promise<Array<{
     video: MediaFile
@@ -194,6 +199,8 @@ export function useVideoProcessing() {
     }> = []
 
     try {
+      let suggestedCat: string | null = null
+
       // Step 1: Category suggestion (once for all videos)
       if (uploadSettings.category === '27' && !combinedSignal.aborted) {
         setPreProcessingStatus(prev => ({
@@ -203,7 +210,7 @@ export function useVideoProcessing() {
         }))
 
         const suggestedCategory = await suggestCategory(videos, combinedSignal)
-        var suggestedCat = (suggestedCategory && suggestedCategory !== '27') ? suggestedCategory : null
+        suggestedCat = (suggestedCategory && suggestedCategory !== '27') ? suggestedCategory : null
         currentStep++
       }
 
@@ -349,6 +356,7 @@ export function useVideoProcessing() {
       throw error
     } finally {
       isProcessingRef.current = false
+      abortControllerRef.current = null
       setPreProcessingStatus({
         isPreProcessing: false,
         currentStep: '',

@@ -71,12 +71,14 @@ export async function analyzeAudio(file: File): Promise<{
 }> {
   return new Promise((resolve, reject) => {
     // Feature detection for Web Audio API - fallback to basic analysis if not available
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebkitAudioContext is a non-standard browser API
     if (typeof window === 'undefined' || (!window.AudioContext && !(window as any).webkitAudioContext)) {
       console.warn('Web Audio API not available, using basic audio analysis')
       analyzeAudioBasic(file).then(resolve).catch(reject)
       return
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebkitAudioContext is a non-standard browser API
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
     const reader = new FileReader()
 

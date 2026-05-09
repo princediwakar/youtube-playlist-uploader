@@ -38,3 +38,9 @@ export interface PlaylistItem {
     itemCount: number
   }
 }
+
+export interface YouTubePlaylistVideo {
+  videoId: string
+  title: string
+  position: number
+}

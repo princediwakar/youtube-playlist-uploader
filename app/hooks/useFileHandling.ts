@@ -45,7 +45,7 @@ export function validateFiles(files: File[]): FileValidationResult {
 }
 
 function createMediaFile(file: File): MediaFile {
-  const fullPath = (file as any).webkitRelativePath || file.name
+  const fullPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
   const pathParts = fullPath.split('/')
   const fileName = pathParts[pathParts.length - 1]
   const folderPath = pathParts.slice(0, -1).join('/')
@@ -64,6 +64,58 @@ function createMediaFile(file: File): MediaFile {
     progress: 0,
     mediaType
   }
+}
+
+type AnalysisResult = Awaited<ReturnType<typeof analyzeMedia>>
+
+function mergeAnalysisResult(v: MediaFile, analysis: AnalysisResult): MediaFile {
+  return {
+    ...v,
+    duration: analysis.duration,
+    mediaType: analysis.mediaType,
+    ...(analysis.mediaType === 'video' ? {
+      thumbnail: analysis.thumbnail,
+      isShort: analysis.isShort,
+      aspectRatio: analysis.aspectRatio,
+    } : {}),
+    ...(analysis.mediaType === 'audio' ? {
+      audioThumbnail: analysis.audioThumbnail,
+      waveform: analysis.waveform,
+      artist: analysis.artist,
+      album: analysis.album,
+      genre: analysis.genre,
+      audioFormat: analysis.audioFormat,
+      bitrate: analysis.bitrate,
+      sampleRate: analysis.sampleRate,
+      channels: analysis.channels,
+    } : {}),
+  }
+}
+
+function startAnalysisForFiles(
+  newMediaFiles: MediaFile[],
+  pendingAnalysisRef: React.MutableRefObject<Map<string, { startIndex: number; relativeIndex: number }>>,
+  getTargetIndex: (storedRef: { startIndex: number; relativeIndex: number } | undefined, relativeIndex: number) => number,
+  setVideos: React.Dispatch<React.SetStateAction<MediaFile[]>>,
+) {
+  newMediaFiles.forEach((mediaFile, relativeIndex) => {
+    const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
+    const targetIndex = getTargetIndex(storedRef, relativeIndex)
+
+    analyzeMedia(mediaFile.file)
+      .then(analysis => {
+        pendingAnalysisRef.current.delete(mediaFile.path)
+        setVideos(currentVideos =>
+          currentVideos.map((v, i) =>
+            i === targetIndex ? mergeAnalysisResult(v, analysis) : v
+          )
+        )
+      })
+      .catch(error => {
+        console.error(`Failed to analyze ${mediaFile.name}:`, error)
+        pendingAnalysisRef.current.delete(mediaFile.path)
+      })
+  })
 }
 
 export function useFileHandling() {
@@ -97,45 +149,15 @@ export function useFileHandling() {
 
     setVideos(prevVideos => [...prevVideos, ...newMediaFiles])
 
-    newMediaFiles.forEach((mediaFile, relativeIndex) => {
-      const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
-      const actualStartIndex = storedRef?.startIndex ?? startIndex
-      const actualIndex = storedRef?.relativeIndex ?? relativeIndex
-
-      analyzeMedia(mediaFile.file)
-        .then(analysis => {
-          pendingAnalysisRef.current.delete(mediaFile.path)
-          setVideos(currentVideos =>
-            currentVideos.map((v, i) =>
-              i === actualStartIndex + actualIndex ? {
-                ...v,
-                duration: analysis.duration,
-                mediaType: analysis.mediaType,
-                ...(analysis.mediaType === 'video' ? {
-                  thumbnail: analysis.thumbnail,
-                  isShort: analysis.isShort,
-                  aspectRatio: analysis.aspectRatio
-                } : {}),
-                ...(analysis.mediaType === 'audio' ? {
-                  audioThumbnail: analysis.audioThumbnail,
-                  waveform: analysis.waveform,
-                  artist: analysis.artist,
-                  album: analysis.album,
-                  genre: analysis.genre,
-                  audioFormat: analysis.audioFormat,
-                  bitrate: analysis.bitrate,
-                  sampleRate: analysis.sampleRate,
-                  channels: analysis.channels
-                } : {})
-              } : v
-            )
-          )
-        })
-        .catch(error => {
-          console.error(`Failed to analyze ${mediaFile.name}:`, error)
-          pendingAnalysisRef.current.delete(mediaFile.path)
-        })
-    })
+    startAnalysisForFiles(
+      newMediaFiles,
+      pendingAnalysisRef,
+      (storedRef, relativeIndex) => {
+        const actualStartIndex = storedRef?.startIndex ?? startIndex
+        return actualStartIndex + (storedRef?.relativeIndex ?? relativeIndex)
+      },
+      setVideos
+    )
 
     return { added: newMediaFiles, errors: [] }
   }, [videos.length])
@@ -170,44 +192,12 @@ export function useFileHandling() {
 
     setVideos(newMediaFiles)
 
-    newMediaFiles.forEach((mediaFile, relativeIndex) => {
-      const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
-      const actualIndex = storedRef?.relativeIndex ?? relativeIndex
-
-      analyzeMedia(mediaFile.file)
-        .then(analysis => {
-          pendingAnalysisRef.current.delete(mediaFile.path)
-          setVideos(currentVideos =>
-            currentVideos.map((v, i) =>
-              i === actualIndex ? {
-                ...v,
-                duration: analysis.duration,
-                mediaType: analysis.mediaType,
-                ...(analysis.mediaType === 'video' ? {
-                  thumbnail: analysis.thumbnail,
-                  isShort: analysis.isShort,
-                  aspectRatio: analysis.aspectRatio
-                } : {}),
-                ...(analysis.mediaType === 'audio' ? {
-                  audioThumbnail: analysis.audioThumbnail,
-                  waveform: analysis.waveform,
-                  artist: analysis.artist,
-                  album: analysis.album,
-                  genre: analysis.genre,
-                  audioFormat: analysis.audioFormat,
-                  bitrate: analysis.bitrate,
-                  sampleRate: analysis.sampleRate,
-                  channels: analysis.channels
-                } : {})
-              } : v
-            )
-          )
-        })
-        .catch(error => {
-          console.error(`Failed to analyze ${mediaFile.name}:`, error)
-          pendingAnalysisRef.current.delete(mediaFile.path)
-        })
-    })
+    startAnalysisForFiles(
+      newMediaFiles,
+      pendingAnalysisRef,
+      (storedRef, relativeIndex) => storedRef?.relativeIndex ?? relativeIndex,
+      setVideos
+    )
 
     return { added: newMediaFiles, errors: [] }
   }, [])

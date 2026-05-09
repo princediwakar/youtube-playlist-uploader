@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       await writeFile(audioTempPath, audioBuffer)
 
       // Use FFprobe to analyze audio file
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FFprobe metadata has no published types
       const metadata = await new Promise<any>((resolve, reject) => {
         ffmpeg.ffprobe(audioTempPath, (err, metadata) => {
           if (err) {
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       })
 
       // Extract relevant audio information
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FFprobe metadata has no published types
       const audioStream = metadata.streams.find((stream: any) => stream.codec_type === 'audio')
       const format = metadata.format
 
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
         // Server-side analysis doesn't generate waveform data yet
         // Client-side Web Audio API handles actual waveform extraction
         waveform: [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FFprobe metadata has no published types
         hasCoverArt: metadata.streams.some((stream: any) => stream.codec_type === 'video'),
         metadata: {
           title: format.tags?.title || null,

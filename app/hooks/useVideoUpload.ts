@@ -219,7 +219,8 @@ export function useVideoUpload() {
 
       const response = await fetch('/api/youtube/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: abortControllerRef.current?.signal
       })
 
       if (!response.ok) {
@@ -242,7 +243,7 @@ export function useVideoUpload() {
     uploadSettings: UploadSettings,
     playlistId?: string,
     onProgress?: (completed: number, total: number) => void,
-    onVideoComplete?: (video: MediaFile, result: any) => void,
+    onVideoComplete?: (video: MediaFile, result: { videoId: string; url: string }) => void,
     onVideoError?: (video: MediaFile, error: Error) => void
   ) => {
     if (!session?.accessToken) {

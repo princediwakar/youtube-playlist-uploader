@@ -158,10 +158,10 @@ export async function POST(request: NextRequest) {
       const isForbiddenError = error.message.includes('forbidden')
 
       // Check error object properties (Google API errors may have code and errors array)
-      if (!isQuotaError && (error as any).code === 403) {
-        // Could be quota error
-        if ((error as any).errors && Array.isArray((error as any).errors)) {
-          const firstErr = (error as any).errors[0]
+      const err = error as { code?: number; errors?: Array<{ reason?: string; message?: string }> }
+      if (!isQuotaError && err.code === 403) {
+        if (err.errors && Array.isArray(err.errors)) {
+          const firstErr = err.errors[0]
           if (firstErr.reason === 'quotaExceeded' || firstErr.message?.includes('quota')) {
             isQuotaError = true
           }
@@ -170,7 +170,9 @@ export async function POST(request: NextRequest) {
 
       // Log additional error details if available
       if ('response' in error) {
-        const responseData = (error as any).response?.data
+        const responseData = (error as {
+          response?: { data?: { error?: { code?: number; message?: string; errors?: Array<{ reason?: string; message?: string }> } } }
+        }).response?.data
         console.error('YouTube API response:', responseData)
 
         // Enhanced quota detection from YouTube API error response

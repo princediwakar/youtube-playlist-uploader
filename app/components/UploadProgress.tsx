@@ -2,73 +2,34 @@
 
 import { FileVideo, Upload, CheckCircle, Pause, Play, X, AlertTriangle } from 'lucide-react'
 import { MediaList } from './MediaList'
-import { MediaFile, UploadSettings } from '@/app/types/video'
+import { useUploadContext } from '@/app/hooks/UploadContext'
 
-interface UploadStats {
-  totalBytes: number
-  uploadedBytes: number
-  uploadSpeed: number
-  estimatedTimeRemaining: number
-  startTime: number
-}
+export function UploadProgress() {
+  const {
+    videos,
+    uploadSettings,
+    loadingExistingVideos,
+    existingPlaylistVideos,
+    preProcessingStatus,
+    aiProcessing,
+    currentUpload,
+    currentPlaylistId,
+    isUploading,
+    isPaused,
+    uploadStats,
+    quotaWarning,
+    pauseUpload,
+    resumeUpload,
+    cancelUpload,
+    removeVideo
+  } = useUploadContext()
 
-interface UploadProgressProps {
-  videos: MediaFile[]
-  uploadSettings: UploadSettings
-  loadingExistingVideos: boolean
-  existingPlaylistVideos: any[]
-  preProcessingStatus: {
-    isPreProcessing: boolean
-    currentStep: string
-    progress: number
-  }
-  aiProcessing: {
-    categoryAnalysis: boolean
-    playlistAnalysis: boolean
-    videoAnalysis: boolean
-    currentVideoAnalysis: string | null
-    addingNavigation: boolean
-  }
-  currentUpload: string | null
-  currentPlaylistId: string | null
-  totalVideos: number
-  completedUploads: number
-  isUploading?: boolean
-  isPaused?: boolean
-  uploadStats?: UploadStats | null
-  quotaWarning?: string | null
-  onPause?: () => void
-  onResume?: () => void
-  onCancel?: () => void
-  onRemoveVideo: (index: number) => void
-}
-
-export function UploadProgress({
-  videos,
-  uploadSettings,
-  loadingExistingVideos,
-  existingPlaylistVideos,
-  preProcessingStatus,
-  aiProcessing,
-  currentUpload,
-  currentPlaylistId,
-  totalVideos,
-  completedUploads,
-  isUploading,
-  isPaused,
-  uploadStats,
-  quotaWarning,
-  onPause,
-  onResume,
-  onCancel,
-  onRemoveVideo
-}: UploadProgressProps) {
-  const pendingVideos = videos.filter(v => v.status === 'pending');
-  const completedVideos = videos.filter(v => v.status === 'completed');
-  const errorVideos = videos.filter(v => v.status === 'error');
-  const totalVideosCount = videos.length;
-  const overallPercentage = totalVideosCount > 0 ? (completedVideos.length / totalVideosCount) * 100 : 100;
-  const batchLimit = uploadSettings.maxVideos;
+  const completedVideos = videos.filter(v => v.status === 'completed')
+  const errorVideos = videos.filter(v => v.status === 'error')
+  const pendingVideos = videos.filter(v => v.status === 'pending')
+  const totalVideosCount = videos.length
+  const overallPercentage = totalVideosCount > 0 ? (completedVideos.length / totalVideosCount) * 100 : 100
+  const batchLimit = uploadSettings.maxVideos
 
   const formatTime = (seconds: number): string => {
     if (!seconds || !isFinite(seconds)) return '--:--'
@@ -77,7 +38,6 @@ export function UploadProgress({
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  // If no videos, show empty state
   if (videos.length === 0) {
     return (
       <div className="bg-yt-panel border border-yt-border rounded-xl sticky top-28 overflow-hidden w-full max-w-full">
@@ -103,7 +63,7 @@ export function UploadProgress({
             <div className="flex items-center gap-2">
               {isPaused ? (
                 <button
-                  onClick={onResume}
+                  onClick={resumeUpload}
                   className="p-1.5 rounded-md bg-yt-blue/20 text-yt-blue hover:bg-yt-blue/30 transition-colors"
                   title="Resume upload"
                 >
@@ -111,7 +71,7 @@ export function UploadProgress({
                 </button>
               ) : (
                 <button
-                  onClick={onPause}
+                  onClick={pauseUpload}
                   className="p-1.5 rounded-md bg-yt-bg text-yt-text-secondary hover:text-yt-text-primary transition-colors"
                   title="Pause upload"
                 >
@@ -119,7 +79,7 @@ export function UploadProgress({
                 </button>
               )}
               <button
-                onClick={onCancel}
+                onClick={cancelUpload}
                 className="p-1.5 rounded-md bg-red-500/20 text-red-500 hover:bg-red-500/30 transition-colors"
                 title="Cancel upload"
               >
@@ -277,7 +237,7 @@ export function UploadProgress({
         <MediaList
           videos={videos}
           maxVideos={uploadSettings.maxVideos}
-          onRemoveVideo={onRemoveVideo}
+          onRemoveVideo={removeVideo}
         />
       </div>
     </div>

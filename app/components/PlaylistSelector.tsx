@@ -1,11 +1,9 @@
 'use client'
 
-import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { UploadSettings, PlaylistItem } from '@/app/types/video'
+import { useUploadContext } from '@/app/hooks/UploadContext'
 
-// YouTube playlist ID format validation
 const YOUTUBE_PLAYLIST_ID_REGEX = /^(PL|LL|UL|FL|OL)[a-zA-Z0-9_-]{31,}$/
 
 export function validatePlaylistId(playlistId: string): boolean {
@@ -17,34 +15,21 @@ export function formatPlaylistId(playlistId: string): string {
   return playlistId.trim().replace(/\s+/g, '')
 }
 
-interface PlaylistSelectorProps {
-  uploadSettings: UploadSettings
-  onSettingsChange: (settings: Partial<UploadSettings>) => void
-  availablePlaylists: PlaylistItem[]
-  loadingPlaylists: boolean
-  existingPlaylistVideos: any[]
-  onFetchUserPlaylists: (forceRefresh?: boolean) => void
-  onFetchExistingPlaylistVideos: (playlistId: string) => void
-  onClearPlaylistCache: () => void
-  onClearPlaylistVideosCache: () => void
-  onSetExistingPlaylistVideos: (videos: any[]) => void
-}
-
-export function PlaylistSelector({
-  uploadSettings,
-  onSettingsChange,
-  availablePlaylists,
-  loadingPlaylists,
-  existingPlaylistVideos,
-  onFetchUserPlaylists,
-  onFetchExistingPlaylistVideos,
-  onClearPlaylistCache,
-  onClearPlaylistVideosCache,
-  onSetExistingPlaylistVideos
-}: PlaylistSelectorProps) {
+export function PlaylistSelector() {
   const { data: session } = useSession()
+  const {
+    uploadSettings,
+    setUploadSettings,
+    availablePlaylists,
+    loadingPlaylists,
+    existingPlaylistVideos,
+    fetchUserPlaylists,
+    fetchExistingPlaylistVideos,
+    clearPlaylistCache,
+    clearPlaylistVideosCache,
+    setExistingPlaylistVideos
+  } = useUploadContext()
 
-  // Only show when upload mode is playlist
   if (uploadSettings.uploadMode !== 'playlist') {
     return null
   }
@@ -60,9 +45,9 @@ export function PlaylistSelector({
               Loaded ({availablePlaylists.length})
               <button
                 onClick={() => {
-                  onClearPlaylistCache()
-                  onClearPlaylistVideosCache()
-                  onSetExistingPlaylistVideos([])
+                  clearPlaylistCache()
+                  clearPlaylistVideosCache()
+                  setExistingPlaylistVideos([])
                 }}
                 className="ml-3 text-yt-blue hover:text-[#65b8ff] font-medium"
               >
@@ -72,7 +57,7 @@ export function PlaylistSelector({
           )}
           {session && !loadingPlaylists && availablePlaylists.length === 0 && (
             <button
-              onClick={() => onFetchUserPlaylists(true)}
+              onClick={() => fetchUserPlaylists(true)}
               className="text-xs text-yt-blue hover:text-[#65b8ff] font-medium"
             >
               Load Playlists
@@ -88,11 +73,12 @@ export function PlaylistSelector({
             name="playlistMode"
             checked={!uploadSettings.useExistingPlaylist}
             onChange={() => {
-              onSettingsChange({
+              setUploadSettings(prev => ({
+                ...prev,
                 useExistingPlaylist: false,
                 selectedPlaylistId: ''
-              })
-              onSetExistingPlaylistVideos([])
+              }))
+              setExistingPlaylistVideos([])
             }}
             className="sr-only"
           />
@@ -108,9 +94,9 @@ export function PlaylistSelector({
             name="playlistMode"
             checked={uploadSettings.useExistingPlaylist}
             onChange={() => {
-              onSettingsChange({ useExistingPlaylist: true })
+              setUploadSettings(prev => ({ ...prev, useExistingPlaylist: true }))
               if (availablePlaylists.length === 0 && !loadingPlaylists) {
-                onFetchUserPlaylists()
+                fetchUserPlaylists()
               }
             }}
             className="sr-only"
@@ -131,7 +117,7 @@ export function PlaylistSelector({
           <input
             type="text"
             value={uploadSettings.playlistName}
-            onChange={(e) => onSettingsChange({ playlistName: e.target.value })}
+            onChange={(e) => setUploadSettings(prev => ({ ...prev, playlistName: e.target.value }))}
             className="w-full bg-yt-bg text-yt-text-primary px-4 py-3 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
             placeholder="Add title"
           />
@@ -151,11 +137,11 @@ export function PlaylistSelector({
                 value={uploadSettings.selectedPlaylistId}
                 onChange={(e) => {
                   const playlistId = e.target.value
-                  onSettingsChange({ selectedPlaylistId: playlistId })
+                  setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
                   if (playlistId) {
-                    onFetchExistingPlaylistVideos(playlistId)
+                    fetchExistingPlaylistVideos(playlistId)
                   } else {
-                    onSetExistingPlaylistVideos([])
+                    setExistingPlaylistVideos([])
                   }
                 }}
                 className="w-full bg-yt-bg text-yt-text-primary px-4 py-3 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none"
@@ -177,7 +163,7 @@ export function PlaylistSelector({
                 <span className="text-yt-red mr-2 font-medium">Notice:</span>
                 No playlists found.
                 <button
-                  onClick={() => onFetchUserPlaylists(true)}
+                  onClick={() => fetchUserPlaylists(true)}
                   className="text-yt-text-primary hover:text-yt-blue ml-2 font-medium"
                 >
                   Try Again
@@ -197,8 +183,8 @@ export function PlaylistSelector({
                         if (playlistId) {
                           const isValid = validatePlaylistId(playlistId)
                           if (isValid) {
-                            onSettingsChange({ selectedPlaylistId: playlistId })
-                            onFetchExistingPlaylistVideos(playlistId)
+                            setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
+                            fetchExistingPlaylistVideos(playlistId)
                           }
                         }
                       }}
@@ -210,8 +196,8 @@ export function PlaylistSelector({
                   <button
                     onClick={() => {
                       const playlistId = 'PLExdYlNNwoiS7KfsjlIy3UHY69r0Qy-e5'
-                      onSettingsChange({ selectedPlaylistId: playlistId })
-                      onFetchExistingPlaylistVideos(playlistId)
+                      setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
+                      fetchExistingPlaylistVideos(playlistId)
                     }}
                     className="px-4 py-2 bg-transparent border border-yt-border rounded-lg text-yt-text-secondary hover:text-yt-text-primary hover:border-yt-text-secondary text-sm whitespace-nowrap transition-colors"
                   >

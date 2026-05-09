@@ -1,20 +1,22 @@
 import './globals.css'
 import { Inter, Playfair_Display } from 'next/font/google'
 import type { Metadata } from 'next'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/auth'
 import Providers from './providers'
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
-  weight: ['300', '400'], // Light 300 for headlines, Regular 400 for body
+  weight: ['300', '400'],
 })
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
   display: 'swap',
-  weight: ['400'], // Regular 400 for accent/display
+  weight: ['400'],
 })
 
 export const metadata: Metadata = {
@@ -26,15 +28,17 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const session = await getServerSession(authOptions)
+
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body className="bg-pearl text-charcoal font-sans antialiased selection:bg-yt-red selection:text-white">
-        <Providers session={undefined}>
+        <Providers session={session}>
           {children}
         </Providers>
       </body>

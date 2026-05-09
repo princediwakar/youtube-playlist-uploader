@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
 import { Layers, Shield, Upload, Settings, Check, Lock, Globe, Users, Calendar, Play, FolderPlus, RefreshCw, Mic, Activity, Image as ImageIcon, Music } from 'lucide-react'

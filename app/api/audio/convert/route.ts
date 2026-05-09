@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
           height: 720,
           waveformColor,
           backgroundColor: '0x0f0f0f',
-          waveMode: waveformMode as any,
+          waveMode: waveformMode as 'point' | 'line' | 'p2p' | 'cline',
           fps: 25,
           outputFormat,
           showMetadata: true,

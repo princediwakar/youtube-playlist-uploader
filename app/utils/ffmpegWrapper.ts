@@ -270,6 +270,7 @@ export async function analyzeAudioFile(
   try {
     await writeFile(audioTempPath, audioBuffer)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FFprobe metadata has no published types
     const metadata = await new Promise<any>((resolve, reject) => {
       ffmpeg.ffprobe(audioTempPath, (err, metadata) => {
         if (err) {
@@ -280,6 +281,7 @@ export async function analyzeAudioFile(
       })
     })
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FFprobe metadata has no published types
     const audioStream = metadata.streams.find((stream: any) => stream.codec_type === 'audio')
     const format = metadata.format
 

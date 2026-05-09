@@ -277,8 +277,9 @@ Always produce professional, engaging metadata that drives watch time, retention
     if (error instanceof Error) {
       console.error('Error message:', error.message)
       if ('response' in error) {
-        console.error('Response status:', (error as any).response?.status)
-        console.error('Response data:', (error as any).response?.data)
+        const response = (error as { response: { status?: number; data?: unknown } }).response
+        console.error('Response status:', response?.status)
+        console.error('Response data:', response?.data)
       }
     }
 

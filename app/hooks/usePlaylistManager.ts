@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { PlaylistItem } from '@/app/types/video'
+import { PlaylistItem, YouTubePlaylistVideo } from '@/app/types/video'
 
 export function usePlaylistManager() {
   const { data: session } = useSession()
@@ -71,7 +71,7 @@ export function usePlaylistManager() {
   }, [PLAYLIST_CACHE_KEY])
 
   // Playlist videos cache utility functions
-  const getCachedPlaylistVideos = useCallback((playlistId: string): { videos: any[], timestamp: number } | null => {
+  const getCachedPlaylistVideos = useCallback((playlistId: string): { videos: YouTubePlaylistVideo[], timestamp: number } | null => {
     try {
       const cacheKey = `${PLAYLIST_VIDEOS_CACHE_KEY}_${playlistId}`
       const cached = localStorage.getItem(cacheKey)
@@ -96,7 +96,7 @@ export function usePlaylistManager() {
     }
   }, [PLAYLIST_VIDEOS_CACHE_KEY, PLAYLIST_VIDEOS_CACHE_DURATION])
 
-  const setCachedPlaylistVideos = useCallback((playlistId: string, videos: any[]) => {
+  const setCachedPlaylistVideos = useCallback((playlistId: string, videos: YouTubePlaylistVideo[]) => {
     try {
       const cacheKey = `${PLAYLIST_VIDEOS_CACHE_KEY}_${playlistId}`
       const cacheData = {
@@ -159,7 +159,7 @@ export function usePlaylistManager() {
         console.log('Playlist data received:', {
           success: data.success,
           playlistsCount: data.playlists?.length,
-          playlists: data.playlists?.map((p: any) => ({ id: p.id, title: p.snippet?.title })),
+          playlists: data.playlists?.map((p: PlaylistItem) => ({ id: p.id, title: p.snippet?.title })),
           isMockData: data.isMockData
         })
 
@@ -176,7 +176,12 @@ export function usePlaylistManager() {
           alert('⚠️ Using mock playlist data due to YouTube API quota exceeded. This is for development purposes only.')
         }
       } else {
-        const errorData = await response.json().catch(() => ({}))
+        let errorData: Record<string, unknown> = {}
+        try {
+          errorData = await response.json()
+        } catch {
+          errorData = { error: response.statusText }
+        }
         console.error('Failed to fetch playlists:', {
           status: response.status,
           statusText: response.statusText,
@@ -184,7 +189,7 @@ export function usePlaylistManager() {
         })
 
         // Show user-friendly error message for quota issues
-        if (response.status === 429 || (errorData.error && errorData.error.includes('quota'))) {
+        if (response.status === 429 || (typeof errorData.error === 'string' && errorData.error.includes('quota'))) {
           alert('YouTube API quota exceeded. Please try again tomorrow or request a quota increase from Google Cloud Console.')
         } else if (response.status === 401) {
           alert('Authentication expired. Please sign out and sign in again.')
@@ -200,7 +205,7 @@ export function usePlaylistManager() {
   }, [session?.accessToken, getCachedPlaylists, setCachedPlaylists])
 
   // Fetch existing playlist videos
-  const fetchExistingPlaylistVideos = useCallback(async (playlistId: string, forceRefresh = false): Promise<any[]> => {
+  const fetchExistingPlaylistVideos = useCallback(async (playlistId: string, forceRefresh = false): Promise<YouTubePlaylistVideo[]> => {
     if (!session?.accessToken) return []
 
     // Check cache first (unless force refresh is requested)

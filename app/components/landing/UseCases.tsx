@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
 import { Video, Users, Briefcase, Upload, FileText, Layers, Folder, Zap, Globe, Lock, Settings, Headphones, Mic, Activity } from 'lucide-react'

@@ -180,8 +180,9 @@ export async function POST(request: NextRequest) {
       
       // Log additional error details if available
       if ('response' in error) {
-        console.error('YouTube API response:', (error as any).response?.data)
-        console.error('Response status:', (error as any).response?.status)
+        const resp = (error as { response?: { data?: unknown; status?: number } }).response
+        console.error('YouTube API response:', resp?.data)
+        console.error('Response status:', resp?.status)
       }
     }
     
@@ -284,10 +285,12 @@ export async function GET(_request: NextRequest) {
       
       // Log additional error details if available
       if ('response' in error) {
-        const response = (error as any).response
+        const response = (error as {
+          response?: { data?: { error?: { code?: number; message?: string; errors?: Array<{ reason?: string; message?: string }> } }; status?: number }
+        }).response
         console.error('YouTube API response:', response?.data)
         console.error('Response status:', response?.status)
-        
+
         // Check for quota errors in response data
         if (response?.data?.error?.errors) {
           const apiErrors = response.data.error.errors

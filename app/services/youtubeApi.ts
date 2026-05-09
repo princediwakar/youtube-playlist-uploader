@@ -141,14 +141,18 @@ export class YouTubeApiService {
     return response.data.items as PlaylistItem[] || []
   }
 
-  async getPlaylistVideos(playlistId: string, maxResults: number = 50): Promise<any[]> {
+  async getPlaylistVideos(playlistId: string, maxResults: number = 50): Promise<Array<{ videoId: string; title: string; position: number }>> {
     const response = await this.youtube.playlistItems.list({
       part: ['snippet', 'contentDetails'],
       playlistId,
       maxResults
     })
 
-    return response.data.items || []
+    return (response.data.items || []).map(item => ({
+      videoId: item.contentDetails?.videoId || '',
+      title: item.snippet?.title || '',
+      position: item.snippet?.position || 0
+    }))
   }
 
   async updateVideoMetadata(videoId: string, metadata: Partial<VideoMetadata>): Promise<void> {
