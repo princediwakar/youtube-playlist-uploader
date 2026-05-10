@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { MediaFile, UploadSettings, isVideoFile, isAudioFile } from '@/app/types/video'
+import type { BaseMediaFile } from '@/app/types/media'
 import { generateAudioFrame } from '@/app/utils/audioHelpers'
 
 export interface UploadQueueItem {
@@ -173,6 +174,11 @@ export function useVideoUpload() {
       formData.append('titleFormat', uploadSettings.titleFormat || 'original')
       formData.append('customTitlePrefix', uploadSettings.customTitlePrefix || '')
       formData.append('customTitleSuffix', uploadSettings.customTitleSuffix || '')
+
+      if ((video as BaseMediaFile).googlePhotosMediaId) {
+        formData.append('googlePhotosMediaId', (video as BaseMediaFile).googlePhotosMediaId!)
+        formData.append('googlePhotosBaseUrl', (video as BaseMediaFile).googlePhotosBaseUrl!)
+      }
 
       // For audio files, generate thumbnail based on settings
       if (isAudioFile(video)) {

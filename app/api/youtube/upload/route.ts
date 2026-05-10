@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '../../../../lib/auth'
 import { YouTubeApiService } from '../../../../app/services/youtubeApi'
+import { GooglePhotosService } from '../../../../app/services/googlePhotosApi'
 import { analyzeContent } from '../../../../app/services/aiService'
 import path from 'path'
 import {
@@ -37,6 +38,8 @@ export async function POST(request: NextRequest) {
     const videoFile = formData.get('video') as File
     const originalFilename = videoFile.name
     const sanitizedFilename = path.basename(originalFilename)
+    const googlePhotosMediaId = formData.get('googlePhotosMediaId') as string || null
+    const googlePhotosBaseUrl = formData.get('googlePhotosBaseUrl') as string || null
     const mediaType = videoFile.type.startsWith('audio/') ? 'audio' : 'video'
     const title = formData.get('title') as string
     const descriptionFromForm = formData.get('description') as string
@@ -189,6 +192,63 @@ export async function POST(request: NextRequest) {
       aiAnalysisUsed: useAiAnalysis,
       mediaType
     })
+
+    // Google Photos import: download from Google, stream to YouTube
+    if (googlePhotosMediaId && googlePhotosBaseUrl) {
+      console.log('Downloading video from Google Photos:', googlePhotosMediaId)
+      const photosService = new GooglePhotosService(session.accessToken as string)
+
+      try {
+        const videoBuffer = await photosService.downloadMedia(googlePhotosBaseUrl)
+        const videoStream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array(videoBuffer))
+            controller.close()
+          },
+        })
+
+        const uploadMetadata = {
+          title: finalTitle,
+          description: description,
+          tags: tags,
+          categoryId: finalCategory,
+          privacyStatus: privacyStatus as 'private' | 'public' | 'unlisted',
+          madeForKids,
+          isShort: isShort && duration <= 60 && aspectRatio <= 1.0,
+        }
+
+        const uploadResponse = await youtubeApi.uploadVideoStream(
+          videoStream,
+          videoBuffer.length,
+          'video/*',
+          uploadMetadata
+        )
+
+        const videoId = uploadResponse.videoId
+
+        if (uploadMode === 'playlist' && playlistId && videoId) {
+          try {
+            const positionNum = position?.trim() ? parseInt(position, 10) : undefined
+            await youtubeApi.addVideoToPlaylist(
+              videoId,
+              playlistId,
+              Number.isNaN(positionNum) ? undefined : positionNum
+            )
+            console.log(`Video ${videoId} added to playlist ${playlistId}`)
+          } catch (playlistError) {
+            console.error('Error adding video to playlist:', playlistError)
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          videoId: videoId,
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+        })
+      } catch (error) {
+        throw error
+      }
+    }
 
     let uploadBuffer: Buffer
     let uploadFilename = sanitizedFilename

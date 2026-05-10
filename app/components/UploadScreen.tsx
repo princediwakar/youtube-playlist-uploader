@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { Upload, FolderOpen, AlertTriangle } from 'lucide-react'
+import { Upload, FolderOpen, Image, AlertTriangle } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
 import { UploadSettings, isVideoFile } from '@/app/types/video'
+import type { GooglePhotosImportItem } from '@/app/types/googlePhotos'
 import { extractPlaylistName } from '@/app/utils/videoHelpers'
+import GooglePhotosPicker from '@/app/components/GooglePhotosPicker'
 import { PlaylistSelector } from '@/app/components/PlaylistSelector'
 import { UploadSettingsPanel } from '@/app/components/UploadSettingsPanel'
 import { UploadProgress } from '@/app/components/UploadProgress'
@@ -48,6 +50,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [isPhotosPickerOpen, setIsPhotosPickerOpen] = useState(false)
   const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
     playlistName: '',
     privacyStatus: 'private',
@@ -112,6 +115,34 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     const files = Array.from(event.target.files || [])
     onDrop(files)
   }
+
+  const handleGooglePhotosImport = useCallback((items: GooglePhotosImportItem[]) => {
+    shortsDetectedRef.current = false
+
+    const placeholderFiles = items.map(item => {
+      const ext = item.mimeType.split('/')[1] || 'mp4'
+      return new File([new Blob()], `${item.filename || item.id}.${ext}`, { type: item.mimeType })
+    })
+
+    const { added: newVideos } = replaceVideos(placeholderFiles)
+
+    setVideos(prev => prev.map(v => {
+      const match = items.find(item =>
+        (item.filename && v.file.name.includes(item.filename)) ||
+        v.file.name.includes(item.id)
+      )
+      if (!match) return v
+      return {
+        ...v,
+        googlePhotosMediaId: match.id,
+        googlePhotosBaseUrl: match.baseUrl,
+        name: match.filename || v.name,
+        size: 'Google Photos',
+      }
+    }))
+
+    setIsPhotosPickerOpen(false)
+  }, [replaceVideos, setVideos])
 
   const { handleOptimizedUpload } = useUploadOrchestrator({
     session,
@@ -212,7 +243,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
           </div>
 
           <div className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               {/* Drag & Drop Individual Videos */}
               <div
                 {...getRootProps()}
@@ -296,6 +327,42 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                   id="folder-upload-input"
                 />
               </div>
+
+              {/* Google Photos Import */}
+              <div
+                className="upload-card cursor-pointer group flex flex-col items-center justify-center min-h-[240px] p-8 border-2 border-dashed border-yt-border hover:border-yt-text-secondary hover:bg-yt-hover"
+                role="button"
+                tabIndex={0}
+                aria-label="Import from Google Photos"
+                onClick={() => setIsPhotosPickerOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setIsPhotosPickerOpen(true)
+                  }
+                }}
+              >
+                <div className="w-20 h-20 rounded-full bg-yt-bg flex items-center justify-center mb-6">
+                  <Image className="text-yt-text-secondary group-hover:text-yt-text-primary transition-colors duration-300" size={36} />
+                </div>
+
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <h4 className="text-lg font-medium text-yt-text-primary">
+                      Google Photos
+                    </h4>
+                    <span className="ml-2 text-xs bg-yt-bg text-yt-text-secondary px-2 py-0.5 rounded-full border border-yt-border">
+                      CLOUD
+                    </span>
+                  </div>
+                  <p className="text-sm text-yt-text-secondary mb-6">
+                    Browse and import your videos directly from Google Photos. Select multiple videos to add to your upload queue.
+                  </p>
+                  <div className="mt-4 text-xs text-yt-text-secondary">
+                    Your Google Photos videos, ready for YouTube
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -339,6 +406,13 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         <UploadProgress />
       </div>
     </div>
+    {isPhotosPickerOpen && (
+      <GooglePhotosPicker
+        isOpen={isPhotosPickerOpen}
+        onClose={() => setIsPhotosPickerOpen(false)}
+        onImport={handleGooglePhotosImport}
+      />
+    )}
     </UploadContext.Provider>
   )
 }

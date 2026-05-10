@@ -15,6 +15,8 @@ export interface BaseMediaFile {
   error?: string
   duration?: number
   mediaType: MediaType  // Discriminator property for type safety
+  googlePhotosMediaId?: string
+  googlePhotosBaseUrl?: string
 }
 
 // Video-specific interface extending base

@@ -52,6 +52,8 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
             <div className="relative w-16 h-9 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-3">
               {isVideoFile(video) && video.thumbnail ? (
                 <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+              ) : isVideoFile(video) && video.googlePhotosBaseUrl ? (
+                <img src={`${video.googlePhotosBaseUrl}=w300-h300`} alt="" className="w-full h-full object-cover" />
               ) : isAudioFile(video) ? (
                 video.waveform && video.waveform.length > 0 ? (
                   <CompactWaveformVisualizer
