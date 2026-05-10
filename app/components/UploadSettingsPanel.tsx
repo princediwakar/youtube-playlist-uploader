@@ -14,8 +14,6 @@ export function UploadSettingsPanel() {
     existingPlaylistVideos,
     showAdvancedSettings,
     setShowAdvancedSettings,
-    isUploading,
-    handleOptimizedUpload,
     clearPlaylistCache,
     clearPlaylistVideosCache,
     setExistingPlaylistVideos
@@ -48,9 +46,9 @@ export function UploadSettingsPanel() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <label className={`cursor-pointer border rounded-xl p-4 flex flex-col transition-all ${uploadSettings.uploadMode === 'playlist' ? 'border-yt-text-primary bg-[#F0F0F0]' : 'border-yt-border bg-yt-bg hover:bg-yt-hover'}`}>
-            <div className="flex items-center mb-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <label className={`cursor-pointer border rounded-xl p-3 sm:p-4 flex flex-col transition-all ${uploadSettings.uploadMode === 'playlist' ? 'border-yt-text-primary bg-[#F0F0F0]' : 'border-yt-border bg-yt-bg hover:bg-yt-hover'}`}>
+            <div className="flex items-center mb-1 sm:mb-2">
               <input
                 type="radio"
                 name="uploadMode"
@@ -59,16 +57,16 @@ export function UploadSettingsPanel() {
                 onChange={(e) => setUploadSettings(prev => ({ ...prev, uploadMode: e.target.value as 'playlist' | 'individual' }))}
                 className="sr-only"
               />
-              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${uploadSettings.uploadMode === 'playlist' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
+              <div className={`w-4 h-4 rounded-full border-2 mr-2 sm:mr-3 flex items-center justify-center flex-shrink-0 ${uploadSettings.uploadMode === 'playlist' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
                 {uploadSettings.uploadMode === 'playlist' && <div className="w-2 h-2 rounded-full bg-yt-blue"></div>}
               </div>
               <span className={`text-sm font-medium ${uploadSettings.uploadMode === 'playlist' ? 'text-yt-text-primary' : 'text-yt-text-secondary'}`}>Upload as Playlist</span>
             </div>
-            <span className="text-xs text-yt-text-secondary ml-7 block mt-1">Group videos together in a sequence</span>
+            <span className="text-xs text-yt-text-secondary ml-6 sm:ml-7 block mt-0.5 sm:mt-1">Group videos together in a sequence</span>
           </label>
 
-          <label className={`cursor-pointer border rounded-xl p-4 flex flex-col transition-all ${uploadSettings.uploadMode === 'individual' ? 'border-yt-text-primary bg-[#F0F0F0]' : 'border-yt-border bg-yt-bg hover:bg-yt-hover'}`}>
-            <div className="flex items-center mb-2">
+          <label className={`cursor-pointer border rounded-xl p-3 sm:p-4 flex flex-col transition-all ${uploadSettings.uploadMode === 'individual' ? 'border-yt-text-primary bg-[#F0F0F0]' : 'border-yt-border bg-yt-bg hover:bg-yt-hover'}`}>
+            <div className="flex items-center mb-1 sm:mb-2">
               <input
                 type="radio"
                 name="uploadMode"
@@ -77,14 +75,14 @@ export function UploadSettingsPanel() {
                 onChange={(e) => setUploadSettings(prev => ({ ...prev, uploadMode: e.target.value as 'playlist' | 'individual' }))}
                 className="sr-only"
               />
-              <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center ${uploadSettings.uploadMode === 'individual' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
+              <div className={`w-4 h-4 rounded-full border-2 mr-2 sm:mr-3 flex items-center justify-center flex-shrink-0 ${uploadSettings.uploadMode === 'individual' ? 'border-yt-blue' : 'border-yt-text-secondary'}`}>
                 {uploadSettings.uploadMode === 'individual' && <div className="w-2 h-2 rounded-full bg-yt-blue"></div>}
               </div>
               <span className={`text-sm font-medium flex items-center flex-wrap ${uploadSettings.uploadMode === 'individual' ? 'text-yt-text-primary' : 'text-yt-text-secondary'}`}>
                 Upload Individually
               </span>
             </div>
-            <span className="text-xs text-yt-text-secondary ml-7 block mt-1">Standalone videos
+            <span className="text-xs text-yt-text-secondary ml-6 sm:ml-7 block mt-0.5 sm:mt-1">Standalone videos
               {videos.filter(v => isVideoFile(v) && v.isShort).length > 0 && <span className="bg-[#F0F0F0] px-1 py-0.5 rounded ml-2 text-[10px]">Shorts Recommended</span>}
             </span>
           </label>
@@ -93,68 +91,25 @@ export function UploadSettingsPanel() {
 
       <PlaylistSelector />
 
-      <div className="grid md:grid-cols-3 gap-6 mb-6">
-        {/* Privacy Setting */}
-        <div>
-          <label className="block text-sm font-medium text-yt-text-primary mb-2">
-            Visibility
-          </label>
-          <div className="relative">
-            <select
-              value={uploadSettings.privacyStatus}
-              onChange={(e) => setUploadSettings(prev => ({
-                ...prev, privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
-              }))}
-              className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
-            >
-              <option value="private">Private</option>
-              <option value="unlisted">Unlisted</option>
-              <option value="public">Public</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
-              <ChevronDown size={16} />
-            </div>
-          </div>
-        </div>
-
-        {/* Upload Limit */}
-        <div>
-          <label className="block text-sm font-medium text-yt-text-primary mb-2">
-            Batch Size
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="50"
-            value={uploadSettings.maxVideos}
+      {/* Visibility */}
+      <div className="mb-4 sm:mb-6">
+        <label className="block text-sm font-medium text-yt-text-primary mb-2">
+          Visibility
+        </label>
+        <div className="relative">
+          <select
+            value={uploadSettings.privacyStatus}
             onChange={(e) => setUploadSettings(prev => ({
-              ...prev, maxVideos: parseInt(e.target.value) || 10
+              ...prev, privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
             }))}
-            className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none"
-          />
-        </div>
-
-        {/* Content Type */}
-        <div>
-          <label className="block text-sm font-medium text-yt-text-primary mb-2">
-            Content Category
-          </label>
-          <div className="relative">
-            <select
-              value={uploadSettings.contentType}
-              onChange={(e) => setUploadSettings(prev => ({ ...prev, contentType: e.target.value }))}
-              className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
-            >
-              <option value="auto">Auto Detect</option>
-              <option value="course">Educational Course</option>
-              <option value="business">Business Vlog</option>
-              <option value="tech">Tech & Programming</option>
-              <option value="creative">Creative Arts</option>
-              <option value="health">Health & Fitness</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
-              <ChevronDown size={16} />
-            </div>
+            className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
+          >
+            <option value="private">Private</option>
+            <option value="unlisted">Unlisted</option>
+            <option value="public">Public</option>
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
+            <ChevronDown size={16} />
           </div>
         </div>
       </div>
@@ -174,7 +129,50 @@ export function UploadSettingsPanel() {
         </button>
 
         {showAdvancedSettings && (
-          <div className="mt-4 p-6 bg-[#F9F9F9] rounded-xl border border-yt-border grid md:grid-cols-2 gap-8">
+          <div className="mt-4 p-4 sm:p-6 bg-[#F9F9F9] rounded-xl border border-yt-border grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+            {/* Batch Size */}
+            <div>
+              <label className="block text-sm font-medium text-yt-text-primary mb-2">
+                Batch Size
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={uploadSettings.maxVideos}
+                onChange={(e) => setUploadSettings(prev => ({
+                  ...prev, maxVideos: parseInt(e.target.value) || 10
+                }))}
+                className="w-full px-4 py-2.5 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none text-sm"
+              />
+              <span className="text-[10px] text-yt-text-secondary mt-1 block">Max videos per batch (1-50)</span>
+            </div>
+
+            {/* Content Category */}
+            <div>
+              <label className="block text-sm font-medium text-yt-text-primary mb-2">
+                Content Category
+              </label>
+              <div className="relative">
+                <select
+                  value={uploadSettings.contentType}
+                  onChange={(e) => setUploadSettings(prev => ({ ...prev, contentType: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer text-sm"
+                >
+                  <option value="auto">Auto Detect</option>
+                  <option value="course">Educational Course</option>
+                  <option value="business">Business Vlog</option>
+                  <option value="tech">Tech & Programming</option>
+                  <option value="creative">Creative Arts</option>
+                  <option value="health">Health & Fitness</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-yt-text-secondary">
+                  <ChevronDown size={14} />
+                </div>
+              </div>
+              <span className="text-[10px] text-yt-text-secondary mt-1 block">Used for AI context, not sent to YouTube</span>
+            </div>
+
             {/* Made for Kids */}
             <div className="flex items-start space-x-3 group">
               <label className="relative flex cursor-pointer mt-0.5">
@@ -295,7 +293,7 @@ export function UploadSettingsPanel() {
             )}
 
             {/* Cache Management */}
-            <div className="md:col-span-2 pt-6 border-t border-yt-border flex flex-col sm:flex-row items-start sm:items-center justify-between">
+            <div className="sm:col-span-2 pt-6 border-t border-yt-border flex flex-col sm:flex-row items-start sm:items-center justify-between">
               <div className="flex items-center text-xs text-yt-text-secondary">
                 <Database size={14} className="mr-2" />
                 <span>Local Cache: </span>
@@ -316,7 +314,7 @@ export function UploadSettingsPanel() {
             </div>
 
             {/* Dropdowns for Categories and Layouts */}
-            <div className="md:col-span-2 grid sm:grid-cols-2 gap-6 pt-6 border-t border-yt-border">
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6 border-t border-yt-border">
               <div>
                 <label className="block text-sm font-medium text-yt-text-primary mb-2 flex items-center justify-between">
                   <span>Video Category</span>
@@ -405,32 +403,11 @@ export function UploadSettingsPanel() {
         )}
       </div>
 
-      <div className="mt-8 pt-4 border-t border-yt-border flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="mt-6 sm:mt-8 pt-4 border-t border-yt-border">
         <div className="text-sm text-yt-text-secondary flex items-center">
           <span className="w-2 h-2 rounded-full bg-yt-blue mr-2 animate-pulse"></span>
           Queued: <span className="font-medium text-yt-text-primary ml-2">{totalQueued} / {totalVideos} videos</span>
         </div>
-
-        <button
-          onClick={handleOptimizedUpload}
-          disabled={
-            isUploading ||
-            (uploadSettings.uploadMode === 'playlist' && (
-              (!uploadSettings.useExistingPlaylist && !uploadSettings.playlistName) ||
-              (uploadSettings.useExistingPlaylist && !uploadSettings.selectedPlaylistId)
-            ))
-          }
-          className="px-6 py-2.5 bg-yt-blue text-black font-medium rounded-full hover:bg-[#65b8ff] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isUploading ? (
-            <span className="flex items-center">
-              <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin mr-2"></div>
-              Uploading...
-            </span>
-          ) : (
-            "Upload videos"
-          )}
-        </button>
       </div>
     </div>
   )

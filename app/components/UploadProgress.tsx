@@ -4,7 +4,12 @@ import { FileVideo, Upload, CheckCircle, Pause, Play, X, AlertTriangle } from 'l
 import { MediaList } from './MediaList'
 import { useUploadContext } from '@/app/hooks/UploadContext'
 
-export function UploadProgress() {
+interface UploadProgressProps {
+  isUploadDisabled: boolean
+  onUpload: () => void
+}
+
+export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressProps) {
   const {
     videos,
     uploadSettings,
@@ -40,22 +45,22 @@ export function UploadProgress() {
 
   if (videos.length === 0) {
     return (
-      <div className="bg-yt-panel border border-yt-border rounded-xl sticky top-28 overflow-hidden w-full max-w-full">
-        <div className="p-4 border-b border-yt-border bg-[#F9F9F9]">
-          <h3 className="text-yt-text-primary font-medium text-base">Progress</h3>
+      <div className="bg-yt-panel border border-yt-border rounded-xl lg:sticky lg:top-24 overflow-hidden w-full max-w-full">
+        <div className="p-3 sm:p-4 border-b border-yt-border bg-[#F9F9F9]">
+          <h3 className="text-yt-text-primary font-medium text-sm sm:text-base">Progress</h3>
         </div>
-        <div className="p-8 text-center text-yt-text-secondary flex flex-col items-center">
-          <div className="w-12 h-12 bg-yt-bg rounded-full flex items-center justify-center mb-4">
-            <FileVideo size={20} />
+        <div className="p-6 sm:p-8 text-center text-yt-text-secondary flex flex-col items-center">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yt-bg rounded-full flex items-center justify-center mb-3 sm:mb-4">
+            <FileVideo size={18} />
           </div>
-          <p className="text-sm">No videos queued for upload.</p>
+          <p className="text-xs sm:text-sm">No videos queued for upload.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="bg-yt-panel border border-yt-border rounded-xl sticky top-28 overflow-hidden w-full max-w-full">
+    <div className="bg-yt-panel border border-yt-border rounded-xl lg:sticky lg:top-24 overflow-hidden w-full max-w-full">
       <div className="p-4 border-b border-yt-border bg-[#F9F9F9]">
         <div className="flex items-center justify-between">
           <h3 className="text-yt-text-primary font-medium text-base">Progress</h3>
@@ -239,6 +244,24 @@ export function UploadProgress() {
           maxVideos={uploadSettings.maxVideos}
           onRemoveVideo={removeVideo}
         />
+
+        {/* Upload button — hidden on mobile (handled by fixed bottom bar) */}
+        <div className="hidden lg:block pt-4 border-t border-yt-border">
+          <button
+            onClick={onUpload}
+            disabled={isUploadDisabled}
+            className="w-full px-6 py-2.5 bg-yt-blue text-black font-medium rounded-full hover:bg-[#65b8ff] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            {isUploading ? (
+              <span className="flex items-center justify-center">
+                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin mr-2"></div>
+                Uploading...
+              </span>
+            ) : (
+              'Upload videos'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

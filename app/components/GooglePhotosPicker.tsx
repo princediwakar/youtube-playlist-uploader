@@ -182,7 +182,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={handleClose}>
       <div
-        className="bg-white border border-yt-border rounded-xl w-full max-w-md m-4"
+        className="bg-white border border-yt-border rounded-xl w-full max-w-sm sm:max-w-md mx-4 my-4"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -199,7 +199,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
         </div>
 
         {/* Content */}
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           {/* Reauth banner */}
           {needsReauth && error && (
             <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg">

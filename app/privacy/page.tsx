@@ -16,18 +16,18 @@ export default function PrivacyPolicyPage() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-8">
+        <div className="bg-white rounded-lg shadow-sm border p-5 sm:p-8">
           <div className="flex items-center mb-8">
             <Shield className="mr-3 text-blue-600" size={32} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Privacy Policy</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Privacy Policy</h1>
               <p className="text-sm text-gray-500 mt-1">Last updated: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
           <div className="prose max-w-none space-y-6">
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">1. Information We Collect</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">1. Information We Collect</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   When you use Universal YouTube Uploader, we collect information necessary to provide our service:
@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">2. How We Use Your Information</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">2. How We Use Your Information</h2>
               <div className="text-gray-700 space-y-3">
                 <p>We use the information we collect to:</p>
                 <ul className="list-disc pl-6 space-y-2">
@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">3. Data Storage and Security</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">3. Data Storage and Security</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   <strong>No Video Storage:</strong> Your video files are not stored on our servers. They are processed temporarily and uploaded directly to YouTube.
@@ -71,7 +71,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Third-Party Services</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">4. Third-Party Services</h2>
               <div className="text-gray-700 space-y-3">
                 <p>Our service integrates with:</p>
                 <ul className="list-disc pl-6 space-y-2">
@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">5. Your Rights</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">5. Your Rights</h2>
               <div className="text-gray-700 space-y-3">
                 <p>You have the right to:</p>
                 <ul className="list-disc pl-6 space-y-2">
@@ -98,7 +98,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Data Retention</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">6. Data Retention</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   We retain your information only as long as necessary to provide our service. Video files are not stored beyond the upload process. Account information is retained until you revoke access or delete your account.
@@ -107,7 +107,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">7. Children's Privacy</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">7. Children's Privacy</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   Our service is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13.
@@ -116,7 +116,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Changes to This Policy</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">8. Changes to This Policy</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
@@ -125,7 +125,7 @@ export default function PrivacyPolicyPage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Contact Us</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">9. Contact Us</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   If you have questions about this Privacy Policy or our data practices, please contact us.

@@ -63,7 +63,7 @@ export default function Hero() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 animate-fade-in">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 pt-10 sm:pt-12 animate-fade-in">
             {[
               { value: '500+', label: 'Videos per batch', description: 'Maximum upload capacity' },
               { value: '95%', label: 'Time saved', description: 'Compared to manual upload' },
@@ -71,10 +71,10 @@ export default function Hero() {
               { value: 'Unlimited', label: 'Team members', description: 'Collaboration scale' }
             ].map((stat, index) => (
               <div key={index} className="text-center group">
-                <div className="text-4xl md:text-5xl font-light text-charcoal mb-2 font-display">{stat.value}</div>
-                <div className="text-sm font-medium text-charcoal mb-1">{stat.label}</div>
-                <div className="text-xs text-slate/70">{stat.description}</div>
-                <div className="mt-4 h-px w-12 mx-auto bg-slate/20 group-hover:bg-yt-red transition-colors duration-300"></div>
+                <div className="text-3xl sm:text-4xl md:text-5xl font-light text-charcoal mb-2 font-display">{stat.value}</div>
+                <div className="text-xs sm:text-sm font-medium text-charcoal mb-1">{stat.label}</div>
+                <div className="text-[10px] sm:text-xs text-slate/70">{stat.description}</div>
+                <div className="mt-3 sm:mt-4 h-px w-12 mx-auto bg-slate/20 group-hover:bg-yt-red transition-colors duration-300"></div>
               </div>
             ))}
           </div>
@@ -84,7 +84,7 @@ export default function Hero() {
             <div className="relative max-w-2xl mx-auto">
               <div className="group relative">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-yt-red/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div className="relative bg-white border border-slate/10 rounded-2xl p-8 shadow-sm">
+                <div className="relative bg-white border border-slate/10 rounded-2xl p-5 sm:p-8 shadow-sm">
                   <div className="flex items-center gap-4 mb-8">
                     <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-yt-red/10 to-yt-red/5 flex items-center justify-center">
                       <Play className="w-7 h-7 text-yt-red" />

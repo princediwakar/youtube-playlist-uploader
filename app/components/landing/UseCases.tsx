@@ -133,15 +133,15 @@ export default function UseCases() {
                 className="group relative"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-yt-red/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                <div className="relative bg-white border border-slate/10 rounded-2xl p-8 transition-all duration-300 group-hover:border-yt-red/30 group-hover:shadow-lg h-full">
+                <div className="relative bg-white border border-slate/10 rounded-2xl p-5 sm:p-8 transition-all duration-300 group-hover:border-yt-red/30 group-hover:shadow-lg h-full">
                   <div className="flex flex-col h-full">
                     {/* Persona header */}
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className={`w-16 h-16 rounded-xl ${useCase.bgColor} flex items-center justify-center flex-shrink-0`}>
-                        <PersonaIcon className={`w-8 h-8 ${useCase.color}`} />
+                    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                      <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl ${useCase.bgColor} flex items-center justify-center flex-shrink-0`}>
+                        <PersonaIcon className={`w-6 h-6 sm:w-8 sm:h-8 ${useCase.color}`} />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-charcoal">
+                        <h3 className="text-lg sm:text-xl font-semibold text-charcoal">
                           {useCase.persona}
                         </h3>
                         <p className="text-sm text-slate mt-1">
@@ -166,11 +166,11 @@ export default function UseCases() {
                         const FeatureIcon = feature.icon
                         return (
                           <div key={idx} className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate/5 transition-colors duration-300">
-                            <div className={`w-10 h-10 rounded-lg ${useCase.bgColor} flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                              <FeatureIcon className={`w-5 h-5 ${useCase.color}`} />
+                            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${useCase.bgColor} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                              <FeatureIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${useCase.color}`} />
                             </div>
                             <div>
-                              <h4 className="text-sm font-semibold text-charcoal mb-1">
+                              <h4 className="text-xs sm:text-sm font-semibold text-charcoal mb-1">
                                 {feature.title}
                               </h4>
                               <p className="text-xs text-slate leading-relaxed">

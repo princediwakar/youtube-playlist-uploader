@@ -49,7 +49,7 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
             </button>
 
             {/* Thumbnail */}
-            <div className="relative w-16 h-9 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-3">
+            <div className="relative w-12 h-7 sm:w-16 sm:h-9 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-2 sm:mr-3">
               {isVideoFile(video) && video.thumbnail ? (
                 <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
               ) : isVideoFile(video) && video.googlePhotosBaseUrl ? (
@@ -58,8 +58,8 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
                 video.waveform && video.waveform.length > 0 ? (
                   <CompactWaveformVisualizer
                     waveform={video.waveform}
-                    width={64}
-                    height={36}
+                    width={48}
+                    height={28}
                     color="#ff3333"
                     backgroundColor="#0f0f0f"
                   />
@@ -86,7 +86,7 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
 
             {/* Info */}
             <div className="flex-1 min-w-0 pr-6">
-              <p className="text-xs font-medium text-yt-text-primary truncate">{video.name}</p>
+              <p className="text-[11px] sm:text-xs font-medium text-yt-text-primary truncate">{video.name}</p>
               <p className="text-[10px] text-yt-text-secondary">
                 {video.size}
                 {video.status !== 'pending' && (

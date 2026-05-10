@@ -66,7 +66,7 @@ export function PlaylistSelector() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-6 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mb-4 sm:mb-5">
         <label className="flex items-center cursor-pointer group">
           <input
             type="radio"
@@ -172,12 +172,12 @@ export function PlaylistSelector() {
 
               <div className="p-4 bg-yt-panel border border-yt-border rounded-lg">
                 <h5 className="text-sm font-medium text-yt-text-primary mb-3">Enter Playlist ID Manually</h5>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex-1">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0">
                     <input
                       type="text"
                       placeholder="Enter Playlist ID..."
-                      className="w-full bg-yt-bg text-yt-text-primary px-4 py-2 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary"
+                      className="w-full bg-yt-bg text-yt-text-primary px-3 sm:px-4 py-2 rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none placeholder:text-yt-text-secondary text-sm"
                       onChange={(e) => {
                         const playlistId = formatPlaylistId(e.target.value)
                         if (playlistId) {
@@ -189,8 +189,8 @@ export function PlaylistSelector() {
                         }
                       }}
                     />
-                    <p className="text-xs text-yt-text-secondary mt-2">
-                      Playlist IDs start with PL, LL, UL, FL, or OL followed by characters
+                    <p className="text-[10px] sm:text-xs text-yt-text-secondary mt-1 sm:mt-2">
+                      Playlist IDs start with PL, LL, UL, FL, or OL
                     </p>
                   </div>
                   <button
@@ -199,7 +199,7 @@ export function PlaylistSelector() {
                       setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
                       fetchExistingPlaylistVideos(playlistId)
                     }}
-                    className="px-4 py-2 bg-transparent border border-yt-border rounded-lg text-yt-text-secondary hover:text-yt-text-primary hover:border-yt-text-secondary text-sm whitespace-nowrap transition-colors"
+                    className="px-3 sm:px-4 py-2 bg-transparent border border-yt-border rounded-lg text-yt-text-secondary hover:text-yt-text-primary hover:border-yt-text-secondary text-xs sm:text-sm whitespace-nowrap transition-colors flex-shrink-0"
                   >
                     Use test ID
                   </button>

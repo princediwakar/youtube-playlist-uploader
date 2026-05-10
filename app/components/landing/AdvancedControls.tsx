@@ -347,13 +347,14 @@ export default function AdvancedControls() {
               <button
                 key={control.id}
                 onClick={() => setActiveControl(control.id)}
-                className={`px-6 py-3 rounded-lg transition-all duration-300 flex items-center gap-2 ${isActive
+                className={`px-3 sm:px-6 py-2 sm:py-3 rounded-lg transition-all duration-300 flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm ${
+                  isActive
                     ? 'bg-yt-red text-white shadow-md'
                     : 'bg-white border border-slate/20 text-charcoal hover:border-yt-red/30 hover:shadow-sm'
-                  }`}
+                }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-sm font-medium">{control.title}</span>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium">{control.title}</span>
               </button>
             )
           })}
@@ -362,20 +363,20 @@ export default function AdvancedControls() {
         {/* Main control display */}
         <div className="relative group">
           <div className="absolute -inset-0.5 bg-gradient-to-r from-yt-red/20 to-transparent rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <div className="relative bg-white border border-slate/10 rounded-2xl p-8 shadow-sm">
-            <div className="flex flex-col lg:flex-row gap-8">
+          <div className="relative bg-white border border-slate/10 rounded-2xl p-5 sm:p-8 shadow-sm">
+            <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
               {/* Left panel - Features list */}
               <div className="lg:w-2/5">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className={`w-16 h-16 rounded-xl ${currentControl.bgColor} flex items-center justify-center flex-shrink-0`}>
-                    <ControlIcon className={`w-8 h-8 ${currentControl.color}`} />
+                <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+                  <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-xl ${currentControl.bgColor} flex items-center justify-center flex-shrink-0`}>
+                    <ControlIcon className={`w-6 h-6 sm:w-8 sm:h-8 ${currentControl.color}`} />
                   </div>
                   <div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yt-red/10 text-yt-red text-xs font-medium mb-2">
+                    <div className="inline-flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full bg-yt-red/10 text-yt-red text-[10px] sm:text-xs font-medium mb-1 sm:mb-2">
                       Active Section
                     </div>
-                    <h3 className="text-2xl font-semibold text-charcoal">{currentControl.title}</h3>
-                    <p className="text-slate mt-2">{currentControl.description}</p>
+                    <h3 className="text-xl sm:text-2xl font-semibold text-charcoal">{currentControl.title}</h3>
+                    <p className="text-xs sm:text-sm text-slate mt-1 sm:mt-2">{currentControl.description}</p>
                   </div>
                 </div>
 
@@ -384,13 +385,13 @@ export default function AdvancedControls() {
                     const FeatureIcon = feature.icon
                     return (
                       <div key={idx} className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-lg ${currentControl.bgColor} flex items-center justify-center flex-shrink-0`}>
-                            <FeatureIcon className={`w-5 h-5 ${currentControl.color}`} />
+                        <div className="flex items-start gap-2 sm:gap-3">
+                          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg ${currentControl.bgColor} flex items-center justify-center flex-shrink-0`}>
+                            <FeatureIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${currentControl.color}`} />
                           </div>
                           <div className="flex-1">
-                            <h4 className="text-lg font-semibold text-charcoal">{feature.title}</h4>
-                            <p className="text-sm text-slate mt-1">{feature.description}</p>
+                            <h4 className="text-base sm:text-lg font-semibold text-charcoal">{feature.title}</h4>
+                            <p className="text-xs sm:text-sm text-slate mt-1">{feature.description}</p>
                           </div>
                         </div>
                       </div>
@@ -402,7 +403,7 @@ export default function AdvancedControls() {
               {/* Right panel - Visual demo */}
               <div className="lg:w-3/5">
                 <div className="sticky top-8">
-                  <div className="bg-gradient-to-br from-slate/5 to-white rounded-xl border border-slate/20 p-6">
+                  <div className="bg-gradient-to-br from-slate/5 to-white rounded-xl border border-slate/20 p-4 sm:p-6">
                     <div className="flex items-center justify-between mb-6">
                       <div>
                         <div className="text-sm font-medium text-charcoal">Live Interface Preview</div>
@@ -420,7 +421,7 @@ export default function AdvancedControls() {
                       {currentControl.features.map((feature, idx) => (
                         <div key={idx} className="space-y-3">
                           <div className="text-sm font-medium text-charcoal px-2">{feature.title}</div>
-                          <div className="p-4 bg-white border border-slate/20 rounded-lg shadow-xs">
+                          <div className="p-3 sm:p-4 bg-white border border-slate/20 rounded-lg shadow-xs">
                             {feature.visual}
                           </div>
                         </div>

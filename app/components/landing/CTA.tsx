@@ -44,7 +44,7 @@ export default function CTA() {
           </div>
 
           {/* Benefits */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-3xl mx-auto pt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 max-w-3xl mx-auto pt-10 sm:pt-12">
             {[
               {
                 icon: <CheckCircle className="w-8 h-8 text-yt-red" />,

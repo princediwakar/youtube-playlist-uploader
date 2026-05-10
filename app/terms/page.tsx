@@ -16,18 +16,18 @@ export default function TermsOfServicePage() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-8">
+        <div className="bg-white rounded-lg shadow-sm border p-5 sm:p-8">
           <div className="flex items-center mb-8">
             <FileText className="mr-3 text-blue-600" size={32} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Terms of Service</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Terms of Service</h1>
               <p className="text-sm text-gray-500 mt-1">Last updated: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
 
           <div className="prose max-w-none space-y-6">
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">1. Acceptance of Terms</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">1. Acceptance of Terms</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   By accessing and using Universal YouTube Uploader ("the Service"), you accept and agree to be bound by the terms and provision of this agreement.
@@ -36,7 +36,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">2. Description of Service</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">2. Description of Service</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   Universal YouTube Uploader is a web application that helps users upload videos to their YouTube channels with enhanced features including:
@@ -51,7 +51,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">3. User Responsibilities</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">3. User Responsibilities</h2>
               <div className="text-gray-700 space-y-3">
                 <p>You agree to:</p>
                 <ul className="list-disc pl-6 space-y-2">
@@ -66,7 +66,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">4. Content and Copyright</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">4. Content and Copyright</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   <strong>Your Content:</strong> You retain ownership of all content you upload through the Service. You grant us a limited license to process and upload your content to YouTube on your behalf.
@@ -81,7 +81,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">5. YouTube Integration</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">5. YouTube Integration</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   Our Service integrates with YouTube's API. By using our Service, you also agree to:
@@ -98,7 +98,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">6. Limitations and Restrictions</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">6. Limitations and Restrictions</h2>
               <div className="text-gray-700 space-y-3">
                 <p>You agree not to:</p>
                 <ul className="list-disc pl-6 space-y-2">
@@ -113,7 +113,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">7. AI-Generated Content</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">7. AI-Generated Content</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   Our Service uses AI to generate video descriptions, titles, and tags. While we strive for accuracy, AI-generated content may not always be perfect. You are responsible for reviewing and approving all content before publication.
@@ -122,7 +122,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">8. Service Availability</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">8. Service Availability</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   We strive to maintain high availability but cannot guarantee uninterrupted service. The Service may be temporarily unavailable due to:
@@ -137,7 +137,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">9. Disclaimer of Warranties</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">9. Disclaimer of Warranties</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED. WE DISCLAIM ALL WARRANTIES INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
@@ -146,7 +146,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">10. Limitation of Liability</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">10. Limitation of Liability</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   IN NO EVENT SHALL WE BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE SERVICE.
@@ -155,7 +155,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">11. Account Termination</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">11. Account Termination</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   We may terminate or suspend your access to the Service at any time for violation of these Terms. You may discontinue use of the Service at any time by revoking access to your Google account.
@@ -164,7 +164,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">12. Changes to Terms</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">12. Changes to Terms</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   We reserve the right to modify these Terms at any time. Changes will be effective upon posting to this page. Continued use of the Service constitutes acceptance of updated Terms.
@@ -173,7 +173,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">13. Governing Law</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">13. Governing Law</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   These Terms shall be governed by and construed in accordance with applicable laws. Any disputes shall be resolved in the appropriate jurisdiction.
@@ -182,7 +182,7 @@ export default function TermsOfServicePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">14. Contact Information</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-4">14. Contact Information</h2>
               <div className="text-gray-700 space-y-3">
                 <p>
                   If you have questions about these Terms of Service, please contact us.
