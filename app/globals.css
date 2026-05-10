@@ -95,34 +95,34 @@
     @apply h-full bg-yt-red transition-all duration-300;
   }
 
-  /* Typography helpers with refined hierarchy */
+  /* Typography helpers with refined hierarchy — mobile-first scaling */
   .heading-xl {
-    @apply text-5xl md:text-6xl lg:text-7xl font-light tracking-tight font-display;
+    @apply text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light tracking-tight font-display;
   }
 
   .heading-lg {
-    @apply text-4xl md:text-5xl font-light tracking-tight font-display;
+    @apply text-3xl sm:text-4xl md:text-5xl font-light tracking-tight font-display;
   }
 
   .heading-md {
-    @apply text-2xl md:text-3xl font-normal tracking-tight font-sans;
+    @apply text-xl sm:text-2xl md:text-3xl font-normal tracking-tight font-sans;
   }
 
   .body-lg {
-    @apply text-lg leading-relaxed text-slate font-sans;
+    @apply text-base sm:text-lg leading-relaxed text-slate font-sans;
   }
 
   .body-md {
-    @apply text-base leading-relaxed text-slate font-sans;
+    @apply text-sm sm:text-base leading-relaxed text-slate font-sans;
   }
 
   .caption {
-    @apply text-sm text-slate/70 font-sans;
+    @apply text-xs sm:text-sm text-slate/70 font-sans;
   }
 
-  /* Layout helpers using 8px grid */
+  /* Layout helpers using 8px grid — mobile-first scaling */
   .section-padding {
-    @apply py-16 md:py-24 lg:py-32; /* 80px, 96px, 128px */
+    @apply py-12 sm:py-16 md:py-24 lg:py-32;
   }
 
   .container-narrow {

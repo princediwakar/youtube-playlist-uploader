@@ -16,7 +16,7 @@ export default function AppShell({ session }: AppShellProps) {
   const effectiveSession = clientSession || session
 
   return (
-    <div className="min-h-screen relative font-sans text-gray-300 selection:bg-youtube-neon selection:text-black pb-8 overflow-x-hidden">
+    <div className="min-h-screen relative font-sans text-gray-300 selection:bg-youtube-neon selection:text-black pb-6 sm:pb-8 overflow-x-hidden">
       {/* Structural Wireframe Overlay */}
       <div className="fixed inset-0 pointer-events-none z-[-1] opacity-30">
         <div className="absolute top-0 left-4 md:left-10 lg:left-20 w-[1px] h-full bg-yt-border"></div>
@@ -26,13 +26,13 @@ export default function AppShell({ session }: AppShellProps) {
       {/* Clean Studio Header */}
       <header className="border-b border-yt-border bg-yt-bg/95 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-[1600px] mx-auto px-4 md:px-10 lg:px-20">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-4 sm:py-0 sm:h-20 gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-yt-red rounded-xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
-                <Youtube className="text-yt-text-primary relative z-10" size={24} />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-3 sm:py-0 sm:h-16 md:h-20 gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-yt-red rounded-xl flex items-center justify-center relative overflow-hidden flex-shrink-0">
+                <Youtube className="text-yt-text-primary relative z-10" size={20} />
               </div>
               <div className="flex flex-col">
-                <h1 className="text-lg md:text-xl font-medium text-yt-text-primary tracking-tight">
+                <h1 className="text-base sm:text-lg md:text-xl font-medium text-yt-text-primary tracking-tight">
                   YouTube Uploader
                 </h1>
                 <span className="text-[10px] md:text-xs text-yt-text-secondary mt-0.5">
@@ -41,11 +41,11 @@ export default function AppShell({ session }: AppShellProps) {
               </div>
             </div>
 
-            <div className="flex items-center space-x-4 ml-auto">
+            <div className="flex items-center space-x-3 sm:space-x-4 w-full sm:w-auto justify-end">
               {effectiveSession ? (
-                <div className="flex items-center space-x-4 md:space-x-6">
+                <div className="flex items-center space-x-3 md:space-x-6">
                   <div className="hidden sm:flex flex-col text-right">
-                    <span className="text-sm font-medium text-yt-text-primary">{effectiveSession.user?.name}</span>
+                    <span className="text-sm font-medium text-yt-text-primary truncate max-w-[160px]">{effectiveSession.user?.name}</span>
                     <span className="text-xs text-green-500 flex items-center justify-end">
                       <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span>
                       Connected
@@ -53,10 +53,10 @@ export default function AppShell({ session }: AppShellProps) {
                   </div>
                   <button
                     onClick={() => signOut()}
-                    className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-sm font-medium transition-colors duration-200 px-3 py-1.5 md:px-4 md:py-2 rounded-full hover:bg-yt-hover"
+                    className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"
                   >
-                    <LogOut className="mr-2" size={14} />
-                    Sign Out
+                    <LogOut className="mr-1.5 sm:mr-2" size={14} />
+                    <span className="hidden sm:inline">Sign Out</span>
                   </button>
                 </div>
               ) : (
@@ -73,7 +73,7 @@ export default function AppShell({ session }: AppShellProps) {
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 lg:px-20 py-8 md:py-12">
+      <main className="max-w-[1600px] mx-auto px-4 md:px-10 lg:px-20 py-6 sm:py-8 md:py-12">
         {!effectiveSession ? <LandingPage /> : <UploadScreen session={effectiveSession} />}
       </main>
     </div>

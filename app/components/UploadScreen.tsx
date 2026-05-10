@@ -191,18 +191,18 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   return (
     <UploadContext.Provider value={contextValue}>
       {authError && (
-        <div className="mb-6 p-4 bg-red-900/20 border border-red-700 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <AlertTriangle className="mr-3 text-red-500" size={20} />
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-900/20 border border-red-700 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-start sm:items-center">
+              <AlertTriangle className="mr-2 sm:mr-3 text-red-500 flex-shrink-0 mt-0.5 sm:mt-0" size={18} />
               <div>
-                <p className="text-red-300 font-medium">{authError}</p>
-                <p className="text-red-400 text-sm mt-1">Please sign out and sign in again to refresh your access token.</p>
+                <p className="text-red-300 font-medium text-sm sm:text-base">{authError}</p>
+                <p className="text-red-400 text-xs sm:text-sm mt-1">Please sign out and sign in again to refresh your access token.</p>
               </div>
             </div>
             <button
               onClick={() => setAuthError(null)}
-              className="text-red-300 hover:text-red-100"
+              className="text-red-300 hover:text-red-100 text-sm self-end sm:self-auto flex-shrink-0"
             >
               Dismiss
             </button>
@@ -210,25 +210,25 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         </div>
       )}
       {quotaWarning && (
-        <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <AlertTriangle className="mr-3 text-yellow-500" size={20} />
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-start sm:items-center">
+              <AlertTriangle className="mr-2 sm:mr-3 text-yellow-500 flex-shrink-0 mt-0.5 sm:mt-0" size={18} />
               <div>
-                <p className="text-yellow-300 font-medium">YouTube API Quota Exceeded</p>
-                <p className="text-yellow-400 text-sm mt-1">{quotaWarning}</p>
+                <p className="text-yellow-300 font-medium text-sm sm:text-base">YouTube API Quota Exceeded</p>
+                <p className="text-yellow-400 text-xs sm:text-sm mt-1">{quotaWarning}</p>
               </div>
             </div>
             <button
               onClick={() => clearQuotaWarning()}
-              className="text-yellow-300 hover:text-yellow-100"
+              className="text-yellow-300 hover:text-yellow-100 text-sm self-end sm:self-auto flex-shrink-0"
             >
               Dismiss
             </button>
           </div>
         </div>
       )}
-      <div className="grid lg:grid-cols-12 gap-8 items-start">
+      <div className="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start">
 
       {/* Left Column: Intake & Configuration */}
       <div className="lg:col-span-8 flex flex-col gap-8">
