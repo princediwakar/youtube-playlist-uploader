@@ -34,6 +34,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
   const pickerWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortedRef = useRef(false)
+  const pickerAnchorRef = useRef<HTMLAnchorElement | null>(null)
 
   const cleanup = useCallback(() => {
     abortedRef.current = true
@@ -85,9 +86,21 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
 
         if (cancelled) return
 
-        // 2. Open Google Photos picker in a new window
+        // 2. Open Google Photos picker — use anchor tag on mobile to avoid popup blockers
         const pickerUrl = pickerUri.endsWith('/') ? `${pickerUri}autoclose` : `${pickerUri}/autoclose`
-        pickerWindowRef.current = window.open(pickerUrl, 'google-photos-picker', 'width=800,height=700')
+        const isMobile = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
+        if (isMobile) {
+          if (!pickerAnchorRef.current) {
+            pickerAnchorRef.current = document.createElement('a')
+            pickerAnchorRef.current.rel = 'noopener noreferrer'
+            pickerAnchorRef.current.target = '_blank'
+          }
+          pickerAnchorRef.current.href = pickerUrl
+          pickerAnchorRef.current.click()
+        } else {
+          pickerWindowRef.current = window.open(pickerUrl, 'google-photos-picker', 'width=800,height=700')
+        }
 
         // 3. Poll until the user finishes picking
         let attempts = 0
@@ -115,7 +128,10 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
           try {
             const res = await fetch(`/api/photos/session?sessionId=${sessionId}`)
             if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
+              const err = await res.json().catch(err => {
+                console.error('Failed to parse session response:', err)
+                return {}
+              })
               if (err.needsReauth) {
                 setNeedsReauth(true)
                 setError('Google Photos permission required. Please sign out and sign in again to grant access.')

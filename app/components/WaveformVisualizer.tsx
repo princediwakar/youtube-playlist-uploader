@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 interface WaveformVisualizerProps {
   waveform: number[]
@@ -30,27 +30,23 @@ export function WaveformVisualizer({
   const isDragging = useRef(false)
 
   // Draw waveform on canvas
-  const drawWaveform = () => {
+  const drawWaveform = useCallback(() => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Fill background if specified
     if (backgroundColor !== 'transparent') {
       ctx.fillStyle = backgroundColor
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
 
-    // Normalize waveform data to fit canvas height
     const maxAmplitude = Math.max(...waveform)
     const normalized = maxAmplitude > 0
       ? waveform.map(v => v / maxAmplitude)
       : waveform.map(() => 0)
 
-    // Draw waveform bars
     const barWidth = canvas.width / normalized.length
     const centerY = canvas.height / 2
     const maxBarHeight = canvas.height * 0.8
@@ -59,7 +55,6 @@ export function WaveformVisualizer({
     ctx.lineWidth = 2
     ctx.beginPath()
 
-    // Draw smooth line through waveform points
     for (let i = 0; i < normalized.length; i++) {
       const amplitude = normalized[i]
       const x = i * barWidth
@@ -74,14 +69,12 @@ export function WaveformVisualizer({
 
     ctx.stroke()
 
-    // Draw playback progress indicator
     if (currentTime > 0 && currentTime <= 1) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
       const progressX = currentTime * canvas.width
       ctx.fillRect(progressX - 1, 0, 2, canvas.height)
     }
 
-    // Draw playhead if interactive
     if (interactive && currentTime > 0 && currentTime <= 1) {
       ctx.fillStyle = '#ffffff'
       const playheadX = currentTime * canvas.width
@@ -91,7 +84,7 @@ export function WaveformVisualizer({
       ctx.lineWidth = 2
       ctx.stroke()
     }
-  }
+  }, [waveform, color, backgroundColor, currentTime, interactive])
 
   // Handle click/tap for seeking
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -114,7 +107,7 @@ export function WaveformVisualizer({
     handleCanvasClick(e)
   }
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging.current || !interactive || !onSeek || !canvasRef.current) return
 
     const canvas = canvasRef.current
@@ -123,7 +116,7 @@ export function WaveformVisualizer({
     const normalizedTime = Math.max(0, Math.min(1, x / canvas.width))
 
     onSeek(normalizedTime)
-  }
+  }, [interactive, onSeek])
 
   const handleMouseUp = () => {
     isDragging.current = false
@@ -140,12 +133,12 @@ export function WaveformVisualizer({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [interactive, onSeek])
+  }, [interactive, onSeek, handleMouseMove])
 
   // Draw waveform when props change
   useEffect(() => {
     drawWaveform()
-  }, [waveform, width, height, color, backgroundColor, currentTime])
+  }, [waveform, width, height, color, backgroundColor, currentTime, drawWaveform])
 
   return (
     <div

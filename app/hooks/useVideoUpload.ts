@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { MediaFile, UploadSettings, isVideoFile, isAudioFile } from '@/app/types/video'
 import type { BaseMediaFile } from '@/app/types/media'
 import { generateAudioFrame } from '@/app/utils/audioHelpers'
+import { uploadToYouTubeResumable } from '@/app/utils/youtubeResumableUpload'
 
 export interface UploadQueueItem {
   video: MediaFile
@@ -150,6 +151,44 @@ export function useVideoUpload() {
     setCurrentUpload(video.name)
 
     try {
+      // Video files: upload directly from client to YouTube (bypasses Vercel body limits)
+      const isGooglePhotos = !!(video as BaseMediaFile).googlePhotosMediaId
+      if (isVideoFile(video) && !isGooglePhotos) {
+        try {
+          const videoId = await uploadToYouTubeResumable(
+            video.file,
+            {
+              title: metadata.title,
+              description: metadata.description,
+              tags: metadata.tags,
+              categoryId: metadata.category,
+              privacyStatus: uploadSettings.privacyStatus,
+              madeForKids: uploadSettings.madeForKids,
+              isShort: isVideoFile(video) ? (video.isShort || false) : false,
+            },
+            undefined,
+            abortControllerRef.current?.signal
+          )
+
+          setCurrentUpload(null)
+
+          // Add to playlist if needed (fire-and-forget — upload already succeeded)
+          if (uploadSettings.uploadMode === 'playlist' && playlistId) {
+            fetch('/api/youtube/upload/complete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ videoId, playlistId, position }),
+            }).catch(err => console.error('Complete endpoint error:', err))
+          }
+
+          return { videoId, url: `https://www.youtube.com/watch?v=${videoId}` }
+        } catch (error) {
+          setCurrentUpload(null)
+          throw error
+        }
+      }
+
+      // Audio files and Google Photos: use server-side upload (FFmpeg / download required)
       // Upload video with pre-processed metadata
       const formData = new FormData()
       formData.append('video', video.file)
@@ -170,7 +209,6 @@ export function useVideoUpload() {
       formData.append('isShort', (isVideoFile(video) ? (video.isShort || false) : false).toString())
       formData.append('duration', (video.duration || 0).toString())
       formData.append('aspectRatio', (isVideoFile(video) ? (video.aspectRatio || 1.78) : 1.78).toString())
-      formData.append('useAiAnalysis', (uploadSettings.useAiAnalysis || false).toString())
       formData.append('titleFormat', uploadSettings.titleFormat || 'original')
       formData.append('customTitlePrefix', uploadSettings.customTitlePrefix || '')
       formData.append('customTitleSuffix', uploadSettings.customTitleSuffix || '')
@@ -287,7 +325,6 @@ export function useVideoUpload() {
     }
 
     let completedCount = 0
-    let failedCount = 0
     const failedItems: UploadQueueItem[] = []
 
     try {
@@ -327,7 +364,6 @@ export function useVideoUpload() {
             }
             return result
           } catch (error) {
-            failedCount++
             const errorMessage = error instanceof Error ? error.message : 'Upload failed'
 
             // Check for quota errors

@@ -15,8 +15,6 @@ export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressPro
     uploadSettings,
     loadingExistingVideos,
     existingPlaylistVideos,
-    preProcessingStatus,
-    aiProcessing,
     currentUpload,
     currentPlaylistId,
     isUploading,
@@ -163,48 +161,6 @@ export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressPro
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* Pre-Processing Status */}
-        {preProcessingStatus.isPreProcessing && (
-          <div className="flex items-start space-x-3 p-3 bg-yt-bg rounded-lg border border-yt-blue/30">
-            <div className="w-4 h-4 border-2 border-yt-blue border-t-transparent rounded-full animate-spin mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-yt-text-primary">Pre-processing</p>
-              <p className="text-xs text-yt-text-secondary truncate mb-2">
-                {preProcessingStatus.currentStep}
-              </p>
-              <div className="h-1 bg-yt-bg border border-yt-border rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-yt-blue transition-all duration-300"
-                  style={{ width: `${preProcessingStatus.progress}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AI Processing Status */}
-        {(aiProcessing.categoryAnalysis || aiProcessing.playlistAnalysis || aiProcessing.videoAnalysis || aiProcessing.addingNavigation) && (
-          <div className="flex items-start space-x-3 p-3 bg-yt-bg rounded-lg border border-yt-border">
-            <div className="w-4 h-4 rounded-full bg-purple-500/20 flex items-center justify-center mt-0.5">
-              <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-yt-text-primary">
-                {aiProcessing.addingNavigation ? 'Updating playlist' : 'AI Processing'}
-              </p>
-              <p className="text-xs text-yt-text-secondary truncate">
-                {aiProcessing.categoryAnalysis && 'Analyzing category...'}
-                {aiProcessing.playlistAnalysis && 'Generating description...'}
-                {aiProcessing.videoAnalysis && aiProcessing.currentVideoAnalysis === 'batch processing' &&
-                  'Processing metadata...'}
-                {aiProcessing.videoAnalysis && aiProcessing.currentVideoAnalysis && aiProcessing.currentVideoAnalysis !== 'batch processing' &&
-                  `Analyzing: ${aiProcessing.currentVideoAnalysis.substring(0, 15)}...`}
-                {aiProcessing.addingNavigation && 'Linking videos...'}
-              </p>
-            </div>
           </div>
         )}
 

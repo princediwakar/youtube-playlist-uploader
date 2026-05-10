@@ -2,15 +2,7 @@
 
 import { signIn } from 'next-auth/react'
 import { ArrowRight, Play } from 'lucide-react'
-import { useState, useEffect } from 'react'
-
 export default function Hero() {
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional entrance animation
-    setIsVisible(true)
-  }, [])
 
   const scrollToUseCases = () => {
     const useCasesSection = document.getElementById('use-cases')
@@ -36,7 +28,7 @@ export default function Hero() {
             </h1>
 
             <p className="body-lg max-w-2xl mx-auto">
-              Upload dozens of videos at once with AI-generated titles, automated playlists, and smart publishing—cutting manual work by 95% for creators, educators, and brands.
+              Upload dozens of videos at once with auto-generated titles, automated playlists, and smart publishing—cutting manual work by 95% for creators, educators, and brands.
             </p>
           </div>
 
@@ -91,7 +83,7 @@ export default function Hero() {
                     </div>
                     <div>
                       <div className="text-xl font-bold text-charcoal">YouTube Upload Studio</div>
-                      <div className="text-sm text-slate/70 mt-1">Batch processing • AI optimization • Ready to publish</div>
+                      <div className="text-sm text-slate/70 mt-1">Batch processing • Smart automation • Ready to publish</div>
                     </div>
                   </div>
 
@@ -112,8 +104,8 @@ export default function Hero() {
                         <div className="text-xs text-slate/70">Videos in queue</div>
                       </div>
                       <div className="text-center p-4 rounded-lg hover:bg-slate/5 transition-colors duration-300 border-x border-slate/10">
-                        <div className="text-2xl font-light text-charcoal mb-1">AI</div>
-                        <div className="text-xs text-slate/70">Processing</div>
+                        <div className="text-2xl font-light text-charcoal mb-1">24</div>
+                        <div className="text-xs text-slate/70">Queued</div>
                       </div>
                       <div className="text-center p-4 rounded-lg hover:bg-slate/5 transition-colors duration-300">
                         <div className="text-2xl font-light text-charcoal mb-1">Ready</div>

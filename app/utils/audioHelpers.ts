@@ -1,5 +1,4 @@
 // app/utils/audioHelpers.ts
-import { AudioFile } from '@/app/types/media'
 
 // Basic audio analysis without Web Audio API
 export async function analyzeAudioBasic(file: File): Promise<{
@@ -304,7 +303,10 @@ function getAudioFormat(fileName: string): string {
     'wma': 'WMA',
     'opus': 'Opus',
     'aiff': 'AIFF',
-    'alac': 'ALAC'
+    'alac': 'ALAC',
+    'amr': 'AMR',
+    '3gp': '3GPP',
+    '3gpp': '3GPP',
   }
 
   return formatMap[extension] || extension.toUpperCase()
@@ -320,20 +322,23 @@ export function isAudioFile(file: File): boolean {
     'audio/x-m4a',
     'audio/flac',
     'audio/ogg',
+    'audio/aac',
     'audio/x-aac',
     'audio/x-ms-wma',
-    'audio/webm'
+    'audio/webm',
+    'audio/amr',
+    'audio/3gpp',
   ]
 
-  const audioExtensions = /\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|aiff|alac)$/i
+  const audioExtensions = /\.(mp3|wav|m4a|flac|ogg|aac|wma|opus|aiff|alac|amr|3gp|3gpp)$/i
 
   return audioMimeTypes.includes(file.type) || audioExtensions.test(file.name)
 }
 
 // Type guard to check if a file is video
 export function isVideoFile(file: File): boolean {
-  const videoMimeTypes = ['video/mp4', 'video/avi', 'video/quicktime', 'video/x-matroska', 'video/x-flv', 'video/x-ms-wmv', 'video/webm', 'video/x-m4v']
-  const videoExtensions = /\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v)$/i
+  const videoMimeTypes = ['video/mp4', 'video/avi', 'video/quicktime', 'video/x-matroska', 'video/x-flv', 'video/x-ms-wmv', 'video/webm', 'video/x-m4v', 'video/3gpp', 'video/mp2t']
+  const videoExtensions = /\.(mp4|avi|mov|mkv|flv|wmv|webm|m4v|3gp|3gpp|ts)$/i
 
   return videoMimeTypes.some(type => file.type.startsWith(type)) || videoExtensions.test(file.name)
 }

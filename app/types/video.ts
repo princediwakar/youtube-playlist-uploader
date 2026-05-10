@@ -14,7 +14,6 @@ export interface UploadSettings {
   // Advanced settings
   madeForKids: boolean
   category: string
-  useAiAnalysis: boolean
   titleFormat: 'original' | 'cleaned' | 'custom'
   customTitlePrefix: string
   customTitleSuffix: string

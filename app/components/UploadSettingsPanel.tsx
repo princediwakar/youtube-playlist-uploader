@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, Check, Database, Sparkles } from 'lucide-react'
+import { ChevronDown, Check, Database } from 'lucide-react'
 import { PlaylistSelector } from './PlaylistSelector'
 import { isVideoFile, isAudioFile } from '@/app/types/video'
 import { useUploadContext } from '@/app/hooks/UploadContext'
@@ -148,31 +148,6 @@ export function UploadSettingsPanel() {
               <span className="text-[10px] text-yt-text-secondary mt-1 block">Max videos per batch (1-50)</span>
             </div>
 
-            {/* Content Category */}
-            <div>
-              <label className="block text-sm font-medium text-yt-text-primary mb-2">
-                Content Category
-              </label>
-              <div className="relative">
-                <select
-                  value={uploadSettings.contentType}
-                  onChange={(e) => setUploadSettings(prev => ({ ...prev, contentType: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer text-sm"
-                >
-                  <option value="auto">Auto Detect</option>
-                  <option value="course">Educational Course</option>
-                  <option value="business">Business Vlog</option>
-                  <option value="tech">Tech & Programming</option>
-                  <option value="creative">Creative Arts</option>
-                  <option value="health">Health & Fitness</option>
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-yt-text-secondary">
-                  <ChevronDown size={14} />
-                </div>
-              </div>
-              <span className="text-[10px] text-yt-text-secondary mt-1 block">Used for AI context, not sent to YouTube</span>
-            </div>
-
             {/* Made for Kids */}
             <div className="flex items-start space-x-3 group">
               <label className="relative flex cursor-pointer mt-0.5">
@@ -191,30 +166,6 @@ export function UploadSettingsPanel() {
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-yt-text-primary mb-1">COPPA Compliance</span>
                 <span className="text-xs text-yt-text-secondary">Flag as made for kids</span>
-              </div>
-            </div>
-
-            {/* AI Analysis */}
-            <div className="flex items-start space-x-3 group">
-              <label className="relative flex cursor-pointer mt-0.5">
-                <input
-                  type="checkbox"
-                  checked={uploadSettings.useAiAnalysis}
-                  onChange={(e) => setUploadSettings(prev => ({
-                    ...prev, useAiAnalysis: e.target.checked
-                  }))}
-                  className="sr-only"
-                />
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.useAiAnalysis ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
-                  {uploadSettings.useAiAnalysis && <Check size={14} className="text-yt-text-primary" />}
-                </div>
-              </label>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-yt-text-primary mb-1 flex items-center">
-                  AI Description & Tags
-                  {uploadSettings.useAiAnalysis && <span className="ml-2 px-1.5 py-0.5 bg-yt-blue/20 text-yt-blue text-[10px] font-bold rounded">ON</span>}
-                </span>
-                <span className="text-xs text-yt-text-secondary">Auto-generate with AI</span>
               </div>
             </div>
 
@@ -344,9 +295,8 @@ export function UploadSettingsPanel() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-yt-text-primary mb-2 flex items-center justify-between">
-                  <span>Title Format</span>
-                  {uploadSettings.titleFormat === 'original' && uploadSettings.useAiAnalysis && <span className="text-purple-400 text-[10px] bg-purple-400/10 px-1.5 py-0.5 rounded flex items-center"><Sparkles size={10} className="mr-1"/> AI Powered</span>}
+                <label className="block text-sm font-medium text-yt-text-primary mb-2">
+                  Title Format
                 </label>
                 <div className="relative">
                   <select

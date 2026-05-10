@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 import { MediaFile, UploadSettings, YouTubePlaylistVideo } from '@/app/types/video'
-import { calculateInsertionPositions } from '@/app/utils/videoHelpers'
+import { generateTitle, getBasename, calculateInsertionPositions } from '@/app/utils/videoHelpers'
 import type { UploadQueueItem } from './useVideoUpload'
 
 interface OrchestratorDeps {
@@ -16,13 +16,6 @@ interface OrchestratorDeps {
   setExistingPlaylistVideos: (videos: YouTubePlaylistVideo[] | ((prev: YouTubePlaylistVideo[]) => YouTubePlaylistVideo[])) => void
   clearPlaylistCache: () => void
   clearPlaylistVideosCache: (playlistId?: string) => void
-  preProcessVideos: (
-    videos: MediaFile[],
-    uploadSettings: UploadSettings,
-    onVideoProcessed?: (video: MediaFile, metadata: { title: string; description: string; tags: string[]; category: string }) => void,
-    signal?: AbortSignal
-  ) => Promise<Array<{ video: MediaFile; metadata: { title: string; description: string; tags: string[]; category: string } }>>
-  generatePlaylistDescription: (videos: MediaFile[], uploadSettings: UploadSettings) => Promise<string>
   uploadVideos: (
     queue: UploadQueueItem[],
     uploadSettings: UploadSettings,
@@ -48,8 +41,6 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
     setExistingPlaylistVideos,
     clearPlaylistCache,
     clearPlaylistVideosCache,
-    preProcessVideos,
-    generatePlaylistDescription,
     uploadVideos,
     addNavigationLinks,
     cancelUpload,
@@ -108,13 +99,12 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
                 throw new Error('Please enter a playlist name')
               }
 
-              const playlistDescription = await generatePlaylistDescription(initialVideosToProcess, uploadSettings)
               const playlistResponse = await fetch('/api/youtube/playlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   title: uploadSettings.playlistName,
-                  description: playlistDescription,
+                  description: '',
                   privacyStatus: uploadSettings.privacyStatus
                 })
               })
@@ -132,8 +122,21 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
           }
         }
 
-        // Phase 2: Pre-processing
-        const processedVideos = await preProcessVideos(initialVideosToProcess, uploadSettings)
+        // Phase 2: Generate metadata from filenames (no AI)
+        const processedVideos = initialVideosToProcess.map(video => ({
+          video,
+          metadata: {
+            title: generateTitle(
+              getBasename(video.file.name),
+              uploadSettings.titleFormat,
+              uploadSettings.customTitlePrefix,
+              uploadSettings.customTitleSuffix
+            ),
+            description: '',
+            tags: [] as string[],
+            category: video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
+          }
+        }))
 
         // Phase 3: Filter duplicates
         let videosToProcess = processedVideos
@@ -188,8 +191,7 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
               activeExistingVideos,
               uploadSettings.titleFormat,
               uploadSettings.customTitlePrefix,
-              uploadSettings.customTitleSuffix,
-              uploadSettings.useAiAnalysis
+              uploadSettings.customTitleSuffix
             )
             const positionMap = new Map<string, number>()
             videosToProcess.forEach((pv, index) => {
@@ -309,8 +311,6 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
     setExistingPlaylistVideos,
     clearPlaylistCache,
     clearPlaylistVideosCache,
-    preProcessVideos,
-    generatePlaylistDescription,
     uploadVideos,
     addNavigationLinks,
     cancelUpload,

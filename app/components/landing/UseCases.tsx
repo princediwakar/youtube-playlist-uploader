@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { Video, Users, Briefcase, Upload, FileText, Layers, Folder, Zap, Globe, Lock, Settings, Headphones, Mic, Activity } from 'lucide-react'
+import { Video, Users, Briefcase, Upload, FileText, Layers, Folder, Zap, Globe, Headphones, Mic, Activity } from 'lucide-react'
 
 const useCases = [
   {
@@ -18,7 +18,7 @@ const useCases = [
       {
         icon: FileText,
         title: 'Auto-generated titles/descriptions',
-        description: 'AI analyzes your video content and generates compelling titles and descriptions automatically.'
+        description: 'Titles are generated automatically from your filenames with customizable formatting.'
       },
       {
         icon: Layers,
@@ -43,7 +43,7 @@ const useCases = [
       {
         icon: FileText,
         title: 'Generate lesson descriptions',
-        description: 'AI creates structured lesson descriptions with learning objectives and key takeaways.'
+        description: 'Use custom title formats and prefixes to create structured, consistent lesson naming.'
       },
       {
         icon: Layers,
@@ -92,8 +92,8 @@ const useCases = [
       },
       {
         icon: Mic,
-        title: 'Podcast AI metadata',
-        description: 'Smart AI generates episode show notes, timestamps, and comprehensive guest summaries.'
+        title: 'Podcast metadata',
+        description: 'Customize titles with prefixes and suffixes for consistent episode naming across seasons.'
       },
       {
         icon: Upload,

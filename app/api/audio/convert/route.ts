@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET endpoint for testing/conversion status
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   return NextResponse.json({
     status: 'ready',
     endpoint: '/api/audio/convert',

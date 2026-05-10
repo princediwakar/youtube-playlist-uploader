@@ -1,4 +1,4 @@
-import { VideoFile, MediaFile } from '@/app/types/video'
+import { MediaFile } from '@/app/types/video'
 
 // Cross-platform basename extraction (works in browser and Node.js)
 export function getBasename(filename: string): string {
@@ -48,37 +48,6 @@ export function cleanTitle(title: string): string {
 
   // Final fallback
   return cleaned || 'Untitled Video'
-}
-
-export function cleanAIGeneratedTitle(aiTitle: string, originalFileName: string): string {
-  if (!aiTitle || aiTitle.trim() === '') {
-    return generateTitle(originalFileName, 'original', '', '')
-  }
-
-  // Remove any folder paths that might have been included by AI
-  let cleaned = aiTitle
-    .replace(/^.*[\/\\]/, '') // Remove everything before the last slash/backslash
-    .replace(/\.[^/.]+$/, '') // Remove file extensions
-    .trim()
-
-  // If the AI title contains a forward slash, it might be a path - extract only the filename part
-  if (cleaned.includes('/')) {
-    const parts = cleaned.split('/')
-    cleaned = parts[parts.length - 1].trim()
-  }
-
-  // Apply YouTube title constraints
-  cleaned = cleaned
-    .replace(/[<>]/g, '') // Remove angle brackets (not allowed)
-    .replace(/\|/g, '-') // Replace pipes with dashes
-    .trim()
-
-  // Ensure max length
-  if (cleaned.length > 100) {
-    cleaned = cleaned.substring(0, 97) + '...'
-  }
-
-  return cleaned || generateTitle(originalFileName, 'original', '', '')
 }
 
 export function generateTitle(
@@ -141,8 +110,7 @@ export function checkForDuplicateVideos(
   existingVideos: Array<{videoId: string, title: string, position: number}>,
   titleFormat: string,
   customTitlePrefix: string,
-  customTitleSuffix: string,
-  useAiAnalysis?: boolean
+  customTitleSuffix: string
 ): MediaFile[] {
   if (existingVideos.length === 0) return videos
 
@@ -171,8 +139,7 @@ export function calculateInsertionPositions(
   existingVideos: Array<{videoId: string, title: string, position: number}>,
   titleFormat: string,
   customTitlePrefix: string,
-  customTitleSuffix: string,
-  useAiAnalysis?: boolean
+  customTitleSuffix: string
 ): number[] {
   if (existingVideos.length === 0) {
     // New playlist: positions start from 0
@@ -206,7 +173,6 @@ export function calculateInsertionPositions(
 
   // Verify that existing videos are in monotonic order relative to folder order
   let lastPosition = -1
-  let lastIndex = -1
   let monotonic = true
   for (let i = 0; i < videos.length; i++) {
     if (targetPositions[i] !== -1) {
@@ -216,7 +182,6 @@ export function calculateInsertionPositions(
         break
       }
       lastPosition = targetPositions[i]
-      lastIndex = i
     }
   }
 

@@ -51,7 +51,10 @@ export class GooglePhotosService {
     })
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}))
+      const errorBody = await response.json().catch(err => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
       throw new GooglePhotosApiError(
         errorBody?.error?.message || `Picker API error: HTTP ${response.status}`,
         response.status
@@ -70,7 +73,10 @@ export class GooglePhotosService {
     })
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}))
+      const errorBody = await response.json().catch(err => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
       throw new GooglePhotosApiError(
         errorBody?.error?.message || `Picker API error: HTTP ${response.status}`,
         response.status
@@ -99,7 +105,10 @@ export class GooglePhotosService {
     })
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}))
+      const errorBody = await response.json().catch(err => {
+        console.error('Failed to parse error response:', err)
+        return {}
+      })
       throw new GooglePhotosApiError(
         errorBody?.error?.message || `Picker API error: HTTP ${response.status}`,
         response.status

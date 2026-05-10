@@ -16,12 +16,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 })
     }
 
+    const isShort = metadata.isShort === true
+
+    let tags = metadata.tags || []
+    let categoryId = metadata.categoryId || '27'
+
+    if (isShort) {
+      tags = [...tags, 'shorts', 'short', 'vertical', 'mobile'].slice(0, 10)
+      if (categoryId === '27') {
+        categoryId = '24'
+      }
+    }
+
     const requestBody = {
       snippet: {
         title: metadata.title,
         description: metadata.description || '',
-        tags: metadata.tags || [],
-        categoryId: metadata.categoryId || '27',
+        tags,
+        categoryId,
       },
       status: {
         privacyStatus: metadata.privacyStatus || 'unlisted',

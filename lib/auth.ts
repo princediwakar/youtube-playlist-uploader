@@ -24,7 +24,7 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, account, user }) {
+    async jwt({ token, account, user: _user }) {
       // Persist the OAuth access_token and refresh_token to the token right after signin
       if (account) {
         token.accessToken = account.access_token
@@ -84,7 +84,7 @@ async function refreshAccessToken(token: JWT) {
       accessTokenExpires: Date.now() + refreshedTokens.expires_in * 1000,
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     }
-  } catch (error) {
+  } catch {
 
     return {
       ...token,

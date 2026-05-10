@@ -48,7 +48,7 @@ export default function PrivacyPolicyPage() {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Upload videos to your YouTube channel</li>
                   <li>Create and manage playlists on your behalf</li>
-                  <li>Generate AI-powered descriptions and tags for your videos</li>
+                  <li>Generate titles and organize your videos into playlists</li>
                   <li>Provide and improve our service</li>
                   <li>Communicate with you about our service</li>
                 </ul>
@@ -76,7 +76,7 @@ export default function PrivacyPolicyPage() {
                 <p>Our service integrates with:</p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li><strong>Google/YouTube:</strong> For authentication and video uploading</li>
-                  <li><strong>DeepSeek API:</strong> For AI-powered content analysis and generation</li>
+
                 </ul>
                 <p>
                   These third-party services have their own privacy policies that govern how they handle your data.

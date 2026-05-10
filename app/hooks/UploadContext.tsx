@@ -4,21 +4,6 @@ import { createContext, useContext } from 'react'
 import type { MediaFile, UploadSettings, PlaylistItem, YouTubePlaylistVideo } from '@/app/types/video'
 import type { UploadQueueItem, UploadStats } from '@/app/hooks/useVideoUpload'
 
-interface PreProcessingStatus {
-  isPreProcessing: boolean
-  currentStep: string
-  progress: number
-  totalSteps: number
-}
-
-interface AiProcessing {
-  categoryAnalysis: boolean
-  playlistAnalysis: boolean
-  videoAnalysis: boolean
-  currentVideoAnalysis: string | null
-  addingNavigation: boolean
-}
-
 export interface UploadContextValue {
   // File state
   videos: MediaFile[]
@@ -39,19 +24,6 @@ export interface UploadContextValue {
   fetchExistingPlaylistVideos: (playlistId: string, forceRefresh?: boolean) => Promise<YouTubePlaylistVideo[]>
   clearPlaylistCache: () => void
   clearPlaylistVideosCache: (playlistId?: string) => void
-
-  // Processing state
-  preProcessingStatus: PreProcessingStatus
-  aiProcessing: AiProcessing
-  preProcessVideos: (
-    videos: MediaFile[],
-    uploadSettings: UploadSettings,
-    onVideoProcessed?: (video: MediaFile, metadata: { title: string; description: string; tags: string[]; category: string }) => void,
-    signal?: AbortSignal
-  ) => Promise<Array<{ video: MediaFile; metadata: { title: string; description: string; tags: string[]; category: string } }>>
-  generatePlaylistDescription: (videos: MediaFile[], uploadSettings: UploadSettings) => Promise<string>
-  suggestCategory: (videos: MediaFile[], signal?: AbortSignal) => Promise<string | null>
-  setAiProcessingState: (updates: Partial<AiProcessing>) => void
 
   // Upload state
   isUploading: boolean

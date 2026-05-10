@@ -1,6 +1,7 @@
 'use client'
 
 import { FileVideo, X, CheckCircle, Music } from 'lucide-react'
+import Image from 'next/image'
 import { MediaFile, isVideoFile, isAudioFile } from '@/app/types/video'
 import { CompactWaveformVisualizer } from './WaveformVisualizer'
 
@@ -51,9 +52,9 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
             {/* Thumbnail */}
             <div className="relative w-12 h-7 sm:w-16 sm:h-9 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-2 sm:mr-3">
               {isVideoFile(video) && video.thumbnail ? (
-                <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+                <Image src={video.thumbnail} alt="" fill className="object-cover" />
               ) : isVideoFile(video) && video.googlePhotosBaseUrl ? (
-                <img src={`${video.googlePhotosBaseUrl}=w300-h300`} alt="" className="w-full h-full object-cover" />
+                <Image src={`${video.googlePhotosBaseUrl}=w300-h300`} alt="" fill className="object-cover" />
               ) : isAudioFile(video) ? (
                 video.waveform && video.waveform.length > 0 ? (
                   <CompactWaveformVisualizer
@@ -64,7 +65,7 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
                     backgroundColor="#0f0f0f"
                   />
                 ) : video.audioThumbnail ? (
-                  <img src={video.audioThumbnail} alt="" className="w-full h-full object-cover" />
+                  <Image src={video.audioThumbnail} alt="" fill className="object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-yt-text-secondary">
                     <Music size={12} />

@@ -22,7 +22,6 @@ export function PlaylistSelector() {
     setUploadSettings,
     availablePlaylists,
     loadingPlaylists,
-    existingPlaylistVideos,
     fetchUserPlaylists,
     fetchExistingPlaylistVideos,
     clearPlaylistCache,

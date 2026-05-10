@@ -8,9 +8,9 @@ export * from './videoHelpers'
 export * from './audioHelpers'
 
 // Import types
-import { MediaFile, VideoFile, AudioFile, isVideoFile, isAudioFile } from '@/app/types/media'
+import { MediaFile, VideoFile, AudioFile } from '@/app/types/media'
 import { analyzeVideo } from './videoHelpers'
-import { analyzeAudio as analyzeAudioMain, detectMediaType as detectMediaTypeFromAudio } from './audioHelpers'
+import { detectMediaType as detectMediaTypeFromAudio } from './audioHelpers'
 import { analyzeAudioWithFallback } from './audioWorker'
 
 // Unified media analysis function

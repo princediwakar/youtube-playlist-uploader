@@ -126,7 +126,7 @@ const controls = [
       },
       {
         title: 'Category selection',
-        description: 'Choose from YouTube categories or let AI suggest the most relevant one.',
+        description: 'Choose from all YouTube categories and set defaults for audio and video content.',
         icon: Settings,
         visual: (
           <div className="p-3 bg-white border border-slate/20 rounded-lg">
@@ -138,7 +138,7 @@ const controls = [
                 </div>
                 <span className="text-sm font-medium text-charcoal">Education</span>
               </div>
-              <div className="text-xs text-slate">AI Suggested ✓</div>
+              <div className="text-xs text-slate">Custom Category</div>
             </div>
           </div>
         )
@@ -289,7 +289,7 @@ const controls = [
       },
       {
         title: 'Smart Podcast Metadata',
-        description: 'AI detects audio content and generates episode notes, timestamps, and categories.',
+        description: 'Configure audio-specific category defaults and custom title formatting for episodes.',
         icon: Music,
         visual: (
           <div className="space-y-2">
@@ -298,8 +298,8 @@ const controls = [
                 <Music className="w-4 h-4 text-purple-600" />
               </div>
               <div>
-                <div className="text-xs font-semibold text-charcoal">🎙️ Episode 42: The Future of AI</div>
-                <div className="text-[10px] text-slate mt-1 line-clamp-2">In this episode, we dive deep into the world of artificial intelligence. We discuss machine learning, neural networks, and how these technologies are shaping our future.</div>
+                <div className="text-xs font-semibold text-charcoal">🎙️ Episode 42: The Future of Tech</div>
+                <div className="text-[10px] text-slate mt-1 line-clamp-2">In this episode, we dive deep into the world of technology and innovation. We discuss machine learning, cloud computing, and how these technologies are shaping our future.</div>
                 <div className="flex gap-1 mt-2">
                   <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate/10 text-slate">#Podcast</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate/10 text-slate">#Tech</span>

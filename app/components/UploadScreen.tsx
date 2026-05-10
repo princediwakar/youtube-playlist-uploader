@@ -13,7 +13,6 @@ import { UploadSettingsPanel } from '@/app/components/UploadSettingsPanel'
 import { UploadProgress } from '@/app/components/UploadProgress'
 import { useFileHandling } from '@/app/hooks/useFileHandling'
 import { usePlaylistManager } from '@/app/hooks/usePlaylistManager'
-import { useVideoProcessing } from '@/app/hooks/useVideoProcessing'
 import { useVideoUpload } from '@/app/hooks/useVideoUpload'
 import { useUploadOrchestrator } from '@/app/hooks/useUploadOrchestrator'
 import UploadContext from '@/app/hooks/UploadContext'
@@ -36,11 +35,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     fetchExistingPlaylistVideos, clearPlaylistCache, clearPlaylistVideosCache,
   } = usePlaylistManager()
   const {
-    preProcessingStatus, aiProcessing,
-    preProcessVideos, generatePlaylistDescription,
-    suggestCategory, setAiProcessingState,
-  } = useVideoProcessing()
-  const {
     isUploading, isPaused, currentUpload, uploadQueue,
     uploadStats, quotaWarning,
     pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
@@ -52,6 +46,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const [authError, setAuthError] = useState<string | null>(null)
   const [isPhotosPickerOpen, setIsPhotosPickerOpen] = useState(false)
   const [isUploadCardsExpanded, setIsUploadCardsExpanded] = useState(true)
+  const [isTouchDevice] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0
+  })
   const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
     playlistName: '',
     privacyStatus: 'private',
@@ -60,7 +58,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     uploadMode: 'playlist',
     madeForKids: false,
     category: '27',
-    useAiAnalysis: false,
     titleFormat: 'cleaned',
     customTitlePrefix: '',
     customTitleSuffix: '',
@@ -106,11 +103,14 @@ export default function UploadScreen({ session }: UploadScreenProps) {
       const playlistName = rootFolder !== 'Root' ? rootFolder : extractPlaylistName(newVideos[0].name)
       setUploadSettings(prev => ({ ...prev, playlistName }))
     }
-  }, [uploadSettings.playlistName, replaceVideos, setVideos])
+  }, [uploadSettings.playlistName, replaceVideos])
 
   const { getRootProps, getInputProps, isDragActive, open: openFileDialog } = useDropzone({
     onDrop,
-    accept: { 'video/*': [], 'audio/*': [] },
+    accept: {
+      'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp', '.3gpp', '.ts'],
+      'audio/*': ['.mp3', '.wav', '.m4a', '.flac', '.ogg', '.aac', '.wma', '.opus', '.aiff', '.alac', '.amr'],
+    },
   })
 
   const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,7 +126,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
       return new File([new Blob()], `${item.filename || item.id}.${ext}`, { type: item.mimeType })
     })
 
-    const { added: newVideos } = replaceVideos(placeholderFiles)
+    replaceVideos(placeholderFiles)
 
     setVideos(prev => prev.map(v => {
       const match = items.find(item =>
@@ -158,8 +158,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     setExistingPlaylistVideos,
     clearPlaylistCache,
     clearPlaylistVideosCache,
-    preProcessVideos,
-    generatePlaylistDescription,
     uploadVideos,
     addNavigationLinks,
     cancelUpload,
@@ -171,8 +169,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     availablePlaylists, loadingPlaylists, existingPlaylistVideos, loadingExistingVideos,
     setExistingPlaylistVideos, fetchUserPlaylists, fetchExistingPlaylistVideos,
     clearPlaylistCache, clearPlaylistVideosCache,
-    preProcessingStatus, aiProcessing, preProcessVideos, generatePlaylistDescription,
-    suggestCategory, setAiProcessingState,
     isUploading, isPaused, currentUpload, uploadQueue, uploadStats, quotaWarning,
     pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
     uploadSettings, setUploadSettings, showAdvancedSettings, setShowAdvancedSettings,
@@ -183,8 +179,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     availablePlaylists, loadingPlaylists, existingPlaylistVideos, loadingExistingVideos,
     setExistingPlaylistVideos, fetchUserPlaylists, fetchExistingPlaylistVideos,
     clearPlaylistCache, clearPlaylistVideosCache,
-    preProcessingStatus, aiProcessing, preProcessVideos, generatePlaylistDescription,
-    suggestCategory, setAiProcessingState,
     isUploading, isPaused, currentUpload, uploadQueue, uploadStats, quotaWarning,
     pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
     uploadSettings, showAdvancedSettings, currentPlaylistId, authError,
@@ -281,10 +275,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                     MULTIPLE
                   </span>
                   <p className="hidden sm:block text-xs sm:text-sm text-yt-text-secondary mb-4">
-                    Drag and drop media files or click to select
+                    {isTouchDevice ? 'Tap to select media files' : 'Drag and drop media files or click to select'}
                   </p>
                   <p className="hidden sm:block text-[10px] text-yt-text-secondary">
-                    Video: MP4, MOV, AVI, MKV, WEBM · Audio: MP3, WAV, M4A, FLAC
+                    Video: MP4, MOV, AVI, MKV, WEBM, 3GP · Audio: MP3, WAV, M4A, FLAC
                   </p>
                 </div>
               )}
@@ -297,13 +291,24 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               tabIndex={0}
               aria-label="Upload playlist from folder"
               onClick={() => {
-                const folderInput = document.querySelector('input[webkitdirectory]') as HTMLInputElement
-                folderInput?.click()
+                if (isTouchDevice) {
+                  const mobileInput = document.getElementById('folder-upload-input-mobile') as HTMLInputElement
+                  mobileInput?.click()
+                } else {
+                  const folderInput = document.querySelector('input[webkitdirectory]') as HTMLInputElement
+                  folderInput?.click()
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  (document.querySelector('input[webkitdirectory]') as HTMLInputElement)?.click()
+                  e.preventDefault()
+                  if (isTouchDevice) {
+                    const mobileInput = document.getElementById('folder-upload-input-mobile') as HTMLInputElement
+                    mobileInput?.click()
+                  } else {
+                    const folderInput = document.querySelector('input[webkitdirectory]') as HTMLInputElement
+                    folderInput?.click()
+                  }
                 }
               }}
             >
@@ -318,10 +323,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                   PLAYLIST
                 </span>
                 <p className="hidden sm:block text-xs sm:text-sm text-yt-text-secondary mb-4">
-                  Select a folder to auto-create a YouTube playlist
+                  {isTouchDevice ? 'Select multiple files to create a playlist' : 'Select a folder to auto-create a YouTube playlist'}
                 </p>
                 <p className="hidden sm:block text-[10px] text-yt-text-secondary">
-                  Perfect for courses, tutorials, or series
+                  {isTouchDevice ? 'Pick all the videos you want in your playlist' : 'Perfect for courses, tutorials, or series'}
                 </p>
               </div>
 
@@ -331,8 +336,16 @@ export default function UploadScreen({ session }: UploadScreenProps) {
                 multiple
                 onChange={handleFolderSelect}
                 className="hidden"
-                accept="video/*,audio/*,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v,.mp3,.wav,.m4a,.flac,.ogg,.aac,.wma,.opus,.aiff,.alac"
+                accept="video/*,audio/*,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.3gpp,.ts,.mp3,.wav,.m4a,.flac,.ogg,.aac,.wma,.opus,.aiff,.alac,.amr"
                 id="folder-upload-input"
+              />
+              <input
+                type="file"
+                multiple
+                onChange={handleFolderSelect}
+                className="hidden"
+                accept="video/*,audio/*,.mp4,.avi,.mov,.mkv,.flv,.wmv,.webm,.m4v,.3gp,.3gpp,.ts,.mp3,.wav,.m4a,.flac,.ogg,.aac,.wma,.opus,.aiff,.alac,.amr"
+                id="folder-upload-input-mobile"
               />
             </div>
 
@@ -351,7 +364,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               }}
             >
               <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-yt-bg flex items-center justify-center mb-4 sm:mb-6">
-                <Image className="text-yt-text-secondary group-hover:text-yt-text-primary transition-colors duration-300" size={28} />
+                <Image className="text-yt-text-secondary group-hover:text-yt-text-primary transition-colors duration-300" size={28} alt="" />
               </div>
               <div className="text-center">
                 <h4 className="text-sm sm:text-lg font-medium text-yt-text-primary mb-1 sm:mb-2">

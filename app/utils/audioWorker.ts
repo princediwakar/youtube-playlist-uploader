@@ -277,7 +277,7 @@ export class AudioAnalyzer {
 
       this.worker.onerror = (error) => {
         console.error('Audio worker error:', error);
-        for (const [id, request] of this.pendingRequests.entries()) {
+        for (const [, request] of this.pendingRequests.entries()) {
           request.reject('Worker error');
         }
         this.pendingRequests.clear();

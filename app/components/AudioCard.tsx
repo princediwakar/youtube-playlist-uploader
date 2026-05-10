@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Play, Pause, SkipBack, SkipForward, Volume2, Scissors, Image as ImageIcon, Music, Headphones, BookOpen } from 'lucide-react'
+import Image from 'next/image'
 import { AudioFile } from '@/app/types/media'
 import { WaveformVisualizer } from './WaveformVisualizer'
 
@@ -448,7 +449,7 @@ export function CompactAudioCard({ audio }: { audio: AudioFile }) {
     <div className="flex items-center p-2 rounded-lg hover:bg-yt-hover transition-colors">
       <div className="relative w-12 h-12 bg-yt-bg rounded overflow-hidden flex-shrink-0 mr-3">
         {audio.audioThumbnail ? (
-          <img src={audio.audioThumbnail} alt="" className="w-full h-full object-cover" />
+          <Image src={audio.audioThumbnail} alt="" fill className="object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-red-600/20">
             <Music size={16} className="text-red-600" />
