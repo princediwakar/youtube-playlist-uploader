@@ -280,7 +280,7 @@ export function useVideoUpload() {
     isPausedRef.current = false
     setUploadQueue(queue)
 
-    const concurrencyLimit = 1
+    const concurrencyLimit = 3
     const chunks = []
     for (let i = 0; i < queue.length; i += concurrencyLimit) {
       chunks.push(queue.slice(i, i + concurrencyLimit))
