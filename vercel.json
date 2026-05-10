@@ -1,8 +1,7 @@
 {
   "functions": {
     "app/api/youtube/upload/route.ts": {
-      "maxDuration": 300,
-      "bodySizeLimit": "500MB"
+      "maxDuration": 300
     }
   }
 }
