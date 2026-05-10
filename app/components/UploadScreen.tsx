@@ -364,7 +364,8 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               }}
             >
               <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-yt-bg flex items-center justify-center mb-4 sm:mb-6">
-                <Image className="text-yt-text-secondary group-hover:text-yt-text-primary transition-colors duration-300" size={28} alt="" />
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- lucide-react icon, not <img> */}
+                <Image className="text-yt-text-secondary group-hover:text-yt-text-primary transition-colors duration-300" size={28} />
               </div>
               <div className="text-center">
                 <h4 className="text-sm sm:text-lg font-medium text-yt-text-primary mb-1 sm:mb-2">
