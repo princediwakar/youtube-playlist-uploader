@@ -34,8 +34,6 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
   const pickerWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortedRef = useRef(false)
-  const pickerAnchorRef = useRef<HTMLAnchorElement | null>(null)
-
   const cleanup = useCallback(() => {
     abortedRef.current = true
     if (pollTimerRef.current) {
@@ -86,21 +84,9 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
 
         if (cancelled) return
 
-        // 2. Open Google Photos picker — use anchor tag on mobile to avoid popup blockers
+        // 2. Open Google Photos picker in a new tab (not a popup) so Google cookies are shared
         const pickerUrl = pickerUri.endsWith('/') ? `${pickerUri}autoclose` : `${pickerUri}/autoclose`
-        const isMobile = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-
-        if (isMobile) {
-          if (!pickerAnchorRef.current) {
-            pickerAnchorRef.current = document.createElement('a')
-            pickerAnchorRef.current.rel = 'noopener noreferrer'
-            pickerAnchorRef.current.target = '_blank'
-          }
-          pickerAnchorRef.current.href = pickerUrl
-          pickerAnchorRef.current.click()
-        } else {
-          pickerWindowRef.current = window.open(pickerUrl, 'google-photos-picker', 'width=800,height=700')
-        }
+        pickerWindowRef.current = window.open(pickerUrl, '_blank')
 
         // 3. Poll until the user finishes picking
         let attempts = 0
@@ -266,7 +252,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
                   </div>
                   <p className="text-yt-text-primary text-center mb-2 font-medium">Select your videos</p>
                   <p className="text-yt-text-secondary text-sm text-center mb-4">
-                    A Google Photos window has opened. Select the videos you want to import, then tap Done.
+                    A Google Photos tab has opened. Select your videos, then close the tab when done.
                   </p>
                   <div className="flex items-center text-yt-text-secondary">
                     <Loader2 className="animate-spin mr-2" size={16} />
