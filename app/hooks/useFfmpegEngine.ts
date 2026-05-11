@@ -39,7 +39,10 @@ interface ConversionJob {
 }
 
 let idCounter = 0
-let globalInstance: { engine: Window | null; booted: boolean } | null = null
+let globalIframe: HTMLIFrameElement | null = null
+let mountCount = 0
+let globalBooted = false
+let globalReady = false
 
 export function useFfmpegEngine() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -47,8 +50,6 @@ export function useFfmpegEngine() {
   const [error, setError] = useState<string | null>(null)
   const pendingRef = useRef<Map<string, ConversionJob>>(new Map())
   const engineRef = useRef<Window | null>(null)
-  const bootedRef = useRef(false)
-  const initRef = useRef<(() => void) | null>(null)
 
   const sendMessage = useCallback((msg: EngineOutgoing) => {
     const iframe = iframeRef.current
@@ -66,33 +67,44 @@ export function useFfmpegEngine() {
   }, [])
 
   useEffect(() => {
-    if (globalInstance?.booted) {
-      setStatus('loading')
-      sendMessage({ type: 'init' })
+    mountCount++
+
+    if (!globalIframe) {
+      globalIframe = document.createElement('iframe')
+      globalIframe.id = 'ffmpeg-engine-global'
+      globalIframe.style.cssText = 'position:fixed;width:1px;height:1px;top:-9999px;left:-9999px;border:none;outline:none;background:transparent'
+      globalIframe.src = '/api/engine'
+      globalIframe.setAttribute('allow', 'cross-origin-isolated')
+      document.body.appendChild(globalIframe)
     }
 
-    const iframe = document.createElement('iframe')
-    iframe.id = 'ffmpeg-engine-' + Math.random().toString(36).slice(2)
-    iframe.style.cssText = 'position:fixed;width:1px;height:1px;top:-9999px;left:-9999px;border:none;outline:none;background:transparent'
-    iframe.src = '/api/engine'
-    iframe.setAttribute('allow', 'cross-origin-isolated; cross-origin-resource-policy: cross-origin')
-    document.body.appendChild(iframe)
+    const iframe = globalIframe
     iframeRef.current = iframe
-    setStatus('booting')
+    engineRef.current = iframe.contentWindow
+
+    if (globalReady) {
+      setStatus('ready')
+    } else if (globalBooted) {
+      setStatus('loading')
+      sendMessage({ type: 'init' })
+    } else {
+      setStatus('booting')
+    }
 
     const onMessage = (e: MessageEvent<EngineIncoming>) => {
+      if (e.source !== iframe.contentWindow) return
+
       const { type } = e.data
 
       if (type === 'boot') {
-        globalInstance = { engine: iframe.contentWindow, booted: true }
-        engineRef.current = iframe.contentWindow
-        bootedRef.current = true
+        globalBooted = true
         sendMessage({ type: 'init' })
         setStatus('loading')
         return
       }
 
       if (type === 'loaded') {
+        globalReady = true
         setStatus('ready')
         return
       }
@@ -130,23 +142,19 @@ export function useFfmpegEngine() {
     }
 
     window.addEventListener('message', onMessage)
-    initRef.current = () => {
-      try {
-        window.removeEventListener('message', onMessage)
-      } catch {}
-      try {
-        document.body.removeChild(iframe)
-      } catch {}
-      iframeRef.current = null
-      engineRef.current = null
-      bootedRef.current = false
-      globalInstance = null
-    }
 
     return () => {
+      window.removeEventListener('message', onMessage)
       cleanup()
-      if (initRef.current) initRef.current()
-      initRef.current = null
+      mountCount--
+      if (mountCount === 0 && globalIframe) {
+        try {
+          document.body.removeChild(globalIframe)
+        } catch {}
+        globalIframe = null
+        globalBooted = false
+        globalReady = false
+      }
     }
   }, [sendMessage, cleanup])
 
@@ -156,7 +164,7 @@ export function useFfmpegEngine() {
         return Promise.reject(new Error(`Engine not ready (status: ${status})`))
       }
 
-      const engine = globalInstance?.engine ?? engineRef.current
+      const engine = globalIframe?.contentWindow ?? engineRef.current
 
       const arrayBuffer: Promise<ArrayBuffer> =
         file instanceof ArrayBuffer ? Promise.resolve(file) : file.arrayBuffer()

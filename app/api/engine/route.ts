@@ -26,8 +26,10 @@ const ENGINE_HTML = `<!DOCTYPE html>
     }, 10000);
   }
 
+  var isLoading = false;
   function loadFfmpeg() {
-    if (loaded) return;
+    if (loaded || isLoading) return;
+    isLoading = true;
     waitForFFmpeg(function(FFmpeg) {
       ffmpeg = new FFmpeg();
       ffmpeg.on('log', function(e) { console.log('[engine]', e.message); });
@@ -39,8 +41,10 @@ const ENGINE_HTML = `<!DOCTYPE html>
         wasmURL: URL.createObjectURL(fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm').then(function(r) { return r.blob(); }))
       }).then(function() {
         loaded = true;
+        isLoading = false;
         parent.postMessage({ type: 'loaded' }, '*');
       }).catch(function(err) {
+        isLoading = false;
         parent.postMessage({ type: 'error', error: 'ffmpeg-load:' + (err && err.message || String(err)) }, '*');
       });
     });
@@ -127,10 +131,12 @@ self.addEventListener('message', function(e) {
     var opts = Object.assign({}, options, { _id: id });
     convert(file, opts);
   }
-})();
+});
 
 parent.postMessage({ type: 'boot' }, '*');
-<\/script>
+
+})();
+</script>
 </body>
 </html>`
 
@@ -141,6 +147,7 @@ export async function GET() {
       'Content-Type': 'text/html; charset=utf-8',
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
       'Pragma': 'no-cache',
       'Expires': '0',
