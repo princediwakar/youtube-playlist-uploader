@@ -23,7 +23,7 @@ interface UploadScreenProps {
 }
 
 export default function UploadScreen({ session }: UploadScreenProps) {
-  const { videos, setVideos, replaceVideos, addVideos, hasStoredFiles, restoreSession, clearSession } = useFileContext()
+  const { videos, setVideos, replaceVideos, addVideos, hasStoredFiles, restoreSession, clearSession, updateVideo } = useFileContext()
   usePlaylistContext()
   const { isUploading, quotaWarning, clearQuotaWarning, uploadVideos } = useVideoUpload()
   const { uploadSettings, setUploadSettings, setCurrentPlaylistId, authError, setAuthError } = useSettingsContext()
@@ -140,9 +140,30 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     await uploadVideos(
       queue,
       uploadSettings,
-      playlistId
+      playlistId,
+      undefined,
+      (video) => {
+        // onVideoStart
+        const idx = videos.findIndex(v => v.path === video.path)
+        if (idx !== -1) updateVideo(idx, { status: 'uploading', progress: 0 })
+      },
+      (video, progress) => {
+        // onVideoProgress
+        const idx = videos.findIndex(v => v.path === video.path)
+        if (idx !== -1) updateVideo(idx, { progress })
+      },
+      (video, result) => {
+        // onVideoComplete
+        const idx = videos.findIndex(v => v.path === video.path)
+        if (idx !== -1) updateVideo(idx, { status: 'completed', progress: 100 })
+      },
+      (video, error) => {
+        // onVideoError
+        const idx = videos.findIndex(v => v.path === video.path)
+        if (idx !== -1) updateVideo(idx, { status: 'error', error: error.message })
+      }
     )
-  }, [session, videos, uploadSettings, uploadVideos, setAuthError])
+  }, [session, videos, uploadSettings, uploadVideos, setAuthError, updateVideo])
 
   // Compute upload button disabled state
   const isUploadDisabled =

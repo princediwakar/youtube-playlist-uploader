@@ -52,6 +52,9 @@ export async function initiateResumableUpload(
     },
   }
 
+  const headersList = await import('next/headers').then(m => m.headers())
+  const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_APP_URL || ''
+
   const initResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
     {
@@ -61,6 +64,7 @@ export async function initiateResumableUpload(
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': metadata.fileType || 'video/*',
         'X-Upload-Content-Length': String(metadata.fileSize || 0),
+        ...(origin ? { 'Origin': origin } : {}),
       },
       body: JSON.stringify(requestBody),
     }

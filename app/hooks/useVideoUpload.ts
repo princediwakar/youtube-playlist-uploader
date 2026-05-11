@@ -147,7 +147,8 @@ export function useVideoUpload() {
     },
     uploadSettings: UploadSettings,
     playlistId?: string,
-    position?: number
+    position?: number,
+    onProgress?: (progress: number) => void
   ): Promise<{ videoId: string; url: string }> => {
     if (!session?.accessToken) {
       throw new Error('Not authenticated')
@@ -186,8 +187,7 @@ export function useVideoUpload() {
                 madeForKids: uploadSettings.madeForKids,
                 isShort: videoProps.isShort,
               },
-              null,
-              undefined,
+              onProgress ? (p) => onProgress(p.percent) : undefined,
               abortControllerRef.current?.signal
             )
             videoId = await uploader.upload()
@@ -203,7 +203,7 @@ export function useVideoUpload() {
                 madeForKids: uploadSettings.madeForKids,
                 isShort: videoProps.isShort,
               },
-              undefined,
+              onProgress ? (p) => onProgress(p.percent) : undefined,
               abortControllerRef.current?.signal
             )
           }
@@ -270,7 +270,7 @@ export function useVideoUpload() {
               madeForKids: uploadSettings.madeForKids,
               isShort: false,
             },
-            undefined,
+            onProgress ? (p) => onProgress(p.percent) : undefined,
             abortControllerRef.current?.signal
           )
 
@@ -422,6 +422,8 @@ export function useVideoUpload() {
     uploadSettings: UploadSettings,
     playlistId?: string,
     onProgress?: (completed: number, total: number) => void,
+    onVideoStart?: (video: MediaFile) => void,
+    onVideoProgress?: (video: MediaFile, progress: number) => void,
     onVideoComplete?: (video: MediaFile, result: { videoId: string; url: string }) => void,
     onVideoError?: (video: MediaFile, error: Error) => void
   ) => {
@@ -465,11 +467,20 @@ export function useVideoUpload() {
           const retryCount = item.retryCount || 0
 
           try {
+            if (onVideoStart) onVideoStart(video)
+
             const result = await retryWithBackoff(async () => {
               while (isPausedRef.current) {
                 await new Promise(resolve => setTimeout(resolve, 500))
               }
-              return uploadVideo(video, metadata, uploadSettings, playlistId, position)
+              return uploadVideo(
+                video,
+                metadata,
+                uploadSettings,
+                playlistId,
+                position,
+                onVideoProgress ? (p) => onVideoProgress(video, p) : undefined
+              )
             }, MAX_RETRIES - retryCount)
 
             completedCount++

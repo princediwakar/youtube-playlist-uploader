@@ -224,7 +224,7 @@ Main app (no COOP/COEP)
 - Add nav link to `/history` in `app/components/AppShell.tsx`
 
 ---
-
+<!-- TODO: NOT IMPLEMENTED YET
 ## Phase 8 — Heavy-User Features
 
 > Build the workflow features that make the app indispensable.
@@ -308,4 +308,4 @@ Phase 3 — Zustand + IndexedDB + Context split   ←→   (Parallel) Phase 4 �
 6. Start upload — verify progress, speed, and ETA are accurate
 7. Kill the tab mid-upload, reopen — verify session restore and byte-range resumption
 8. Visit `/history` — verify all uploads recorded with correct metadata
-9. Open YouTube playlist — verify all videos present in correct order
+9. Open YouTube playlist — verify all videos present in correct order -->
