@@ -148,7 +148,7 @@ export function useVideoUpload() {
     uploadSettings: UploadSettings,
     playlistId?: string,
     position?: number,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: { percent: number; bytesUploaded: number; totalBytes: number }) => void
   ): Promise<{ videoId: string; url: string }> => {
     if (!session?.accessToken) {
       throw new Error('Not authenticated')
@@ -188,7 +188,7 @@ export function useVideoUpload() {
                 isShort: videoProps.isShort,
               },
               null,
-              onProgress ? (p) => onProgress(p.percent) : undefined,
+              onProgress,
               abortControllerRef.current?.signal
             )
             videoId = await uploader.upload()
@@ -204,7 +204,7 @@ export function useVideoUpload() {
                 madeForKids: uploadSettings.madeForKids,
                 isShort: videoProps.isShort,
               },
-              onProgress ? (p) => onProgress(p.percent) : undefined,
+              onProgress,
               abortControllerRef.current?.signal
             )
           }
@@ -271,7 +271,7 @@ export function useVideoUpload() {
               madeForKids: uploadSettings.madeForKids,
               isShort: false,
             },
-            onProgress ? (p) => onProgress(p.percent) : undefined,
+            onProgress,
             abortControllerRef.current?.signal
           )
 
@@ -450,7 +450,8 @@ export function useVideoUpload() {
     }
 
     let completedCount = 0
-    let uploadedBytes = 0
+    let uploadedBytesFromCompleted = 0
+    const activeUploadsBytes = new Map<string, number>()
 
     try {
       for (const chunk of chunks) {
@@ -480,13 +481,21 @@ export function useVideoUpload() {
                 uploadSettings,
                 playlistId,
                 position,
-                onVideoProgress ? (p) => onVideoProgress(video, p) : undefined
+                (p) => {
+                  if (onVideoProgress) onVideoProgress(video, p.percent)
+                  activeUploadsBytes.set(video.name, p.bytesUploaded)
+                  const currentActiveBytes = Array.from(activeUploadsBytes.values()).reduce((a, b) => a + b, 0)
+                  updateStats(completedCount, uploadedBytesFromCompleted + currentActiveBytes, queue.length, startTime)
+                }
               )
             }, MAX_RETRIES - retryCount)
 
             completedCount++
-            uploadedBytes += video.file?.size || 0
-            updateStats(completedCount, uploadedBytes, queue.length, startTime)
+            uploadedBytesFromCompleted += video.file?.size || 0
+            activeUploadsBytes.delete(video.name)
+            
+            const currentActiveBytes = Array.from(activeUploadsBytes.values()).reduce((a, b) => a + b, 0)
+            updateStats(completedCount, uploadedBytesFromCompleted + currentActiveBytes, queue.length, startTime)
             if (onProgress) {
               onProgress(completedCount, queue.length)
             }

@@ -64,7 +64,10 @@ export async function initiateResumableUpload(
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': metadata.fileType || 'video/*',
         'X-Upload-Content-Length': String(metadata.fileSize || 0),
-        ...(origin ? { 'Origin': origin } : {}),
+        ...(origin ? { 
+          'Origin': origin,
+          'x-origin': origin 
+        } : {}),
       },
       body: JSON.stringify(requestBody),
     }
