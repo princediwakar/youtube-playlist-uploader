@@ -157,7 +157,7 @@ export class ChunkedUploader {
     return response.arrayBuffer()
   }
 
-  private async uploadChunk(
+  private uploadChunk(
     uploadUrl: string,
     chunk: Blob,
     rangeStart: number,
@@ -165,28 +165,45 @@ export class ChunkedUploader {
     totalSize: number,
     signal: AbortSignal
   ): Promise<{ status: number; body: unknown }> {
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${totalSize}`,
-        'Content-Length': String(chunk.size),
-      },
-      body: chunk,
-      signal,
-    })
-
-    if (response.ok || response.status === 308) {
-      let body: unknown = null
-      try {
-        body = await response.json()
-      } catch {
-        // chunk response has no body on 308
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', uploadUrl, true)
+      xhr.setRequestHeader('Content-Range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`)
+      
+      const abortHandler = () => xhr.abort()
+      if (signal) {
+        if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'))
+        signal.addEventListener('abort', abortHandler)
       }
-      return { status: response.status, body }
-    }
 
-    const errorBody = await response.text().catch(() => '')
-    throw new Error(`Chunk upload failed: HTTP ${response.status} - ${errorBody}`)
+      xhr.onload = () => {
+        const status = xhr.status
+        if ((status >= 200 && status < 300) || status === 308) {
+          let body: unknown = null
+          if (xhr.responseText) {
+            try {
+              body = JSON.parse(xhr.responseText)
+            } catch {
+              // chunk response might have no body on 308
+            }
+          }
+          resolve({ status, body })
+        } else {
+          reject(new Error(`Chunk upload failed: HTTP ${status} - ${xhr.responseText}`))
+        }
+      }
+
+      xhr.onerror = () => reject(new Error('Network error during chunk upload'))
+      xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
+
+      xhr.onloadend = () => {
+        if (signal) {
+          signal.removeEventListener('abort', abortHandler)
+        }
+      }
+
+      xhr.send(chunk)
+    })
   }
 
   private async uploadChunkWithRetry(
