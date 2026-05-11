@@ -80,7 +80,7 @@ export default function AppShell({ session }: AppShellProps) {
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-10 lg:px-20 py-6 sm:py-8 md:py-12">
+      <main className="max-w-[1600px] mx-auto px-4 md:px-10 lg:px-20 py-6 sm:py-8 md:py-12 pb-32 lg:pb-12">
         {!effectiveSession ? <LandingPage /> : <UploadScreen session={effectiveSession} />}
       </main>
     </div>

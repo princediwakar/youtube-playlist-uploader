@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown, Check, Database } from 'lucide-react'
+import { ChevronDown, Check, Database, Info } from 'lucide-react'
 import { PlaylistSelector } from './PlaylistSelector'
 import { isVideoFile, isAudioFile } from '@/app/types/video'
 import { useFileContext } from '@/app/contexts/FileContext'
@@ -97,8 +97,14 @@ export function UploadSettingsPanel() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {/* Visibility */}
         <div>
-          <label className="block text-sm font-medium text-yt-text-primary mb-2">
+          <label className="flex items-center text-sm font-medium text-yt-text-primary mb-2 group relative">
             Visibility
+            <div className="ml-1.5 cursor-help">
+              <Info size={14} className="text-yt-text-secondary" />
+            </div>
+            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 hidden sm:block">
+              Controls who can see your videos on YouTube.
+            </div>
           </label>
           <div className="relative">
             <select
@@ -120,8 +126,14 @@ export function UploadSettingsPanel() {
 
         {/* Batch Size - moved outside collapsible */}
         <div>
-          <label className="block text-sm font-medium text-yt-text-primary mb-2">
+          <label className="flex items-center text-sm font-medium text-yt-text-primary mb-2 group relative">
             Batch Size
+            <div className="ml-1.5 cursor-help">
+              <Info size={14} className="text-yt-text-secondary" />
+            </div>
+            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 hidden sm:block">
+              Number of videos uploaded concurrently. Higher = faster but uses more memory.
+            </div>
           </label>
           <input
             type="number"
@@ -301,8 +313,14 @@ export function UploadSettingsPanel() {
             {/* Dropdowns for Title Format */}
             <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6 border-t border-yt-border">
               <div>
-                <label className="block text-sm font-medium text-yt-text-primary mb-2">
+                <label className="flex items-center text-sm font-medium text-yt-text-primary mb-2 group relative">
                   Title Format
+                  <div className="ml-1.5 cursor-help">
+                    <Info size={14} className="text-yt-text-secondary" />
+                  </div>
+                  <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-10 hidden sm:block">
+                    How video titles should be generated from filenames.
+                  </div>
                 </label>
                 <div className="relative">
                   <select
