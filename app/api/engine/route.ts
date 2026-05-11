@@ -28,26 +28,28 @@ const ENGINE_HTML = `<!DOCTYPE html>
   }
 
   var isLoading = false;
-  function loadFfmpeg() {
+function loadFfmpeg() {
     if (loaded || isLoading) return;
     isLoading = true;
-    waitForFFmpeg(function(FFmpeg) {
-      ffmpeg = new FFmpeg();
-      ffmpeg.on('log', function(e) { console.log('[engine]', e.message); });
-      ffmpeg.on('progress', function(e) {
-        try { parent.postMessage({ type: 'progress', progress: Math.round(e.progress * 100) }, '*'); } catch {}
-      });
-      ffmpeg.load({
-        coreURL: URL.createObjectURL(fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js').then(function(r) { return r.blob(); })),
-        wasmURL: URL.createObjectURL(fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm').then(function(r) { return r.blob(); }))
-      }).then(function() {
+    
+    // In 0.12.x, the constructor is FFmpegWASM.FFmpeg
+    const { FFmpeg } = FFmpegWASM; 
+    ffmpeg = new FFmpeg();
+
+    ffmpeg.on('log', ({ message }) => console.log('[engine]', message));
+    
+    // Direct loading is more stable in the edge runtime/iframe context
+    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+    ffmpeg.load({
+        coreURL: baseURL + '/ffmpeg-core.js',
+        wasmURL: baseURL + '/ffmpeg-core.wasm',
+    }).then(() => {
         loaded = true;
         isLoading = false;
         parent.postMessage({ type: 'loaded' }, '*');
-      }).catch(function(err) {
+    }).catch(err => {
         isLoading = false;
-        parent.postMessage({ type: 'error', error: 'ffmpeg-load:' + (err && err.message || String(err)) }, '*');
-      });
+        parent.postMessage({ type: 'error', error: 'ffmpeg-load:' + err.message }, '*');
     });
   }
 

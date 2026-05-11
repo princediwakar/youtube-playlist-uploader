@@ -53,10 +53,8 @@ export async function initiateResumableUpload(
     },
   }
 
-  const headersList = await import('next/headers').then(m => m.headers())
-  const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_APP_URL || ''
 
-  const initResponse = await fetch(
+const initResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
     {
       method: 'POST',
@@ -65,10 +63,9 @@ export async function initiateResumableUpload(
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': metadata.fileType || 'video/*',
         'X-Upload-Content-Length': String(metadata.fileSize || 0),
-        ...(origin ? { 
-          'Origin': origin,
-          'x-origin': origin 
-        } : {}),
+        // REMOVE Manual Origin headers here. 
+        // If the client initiates the session, the browser handles this.
+        // If the server initiates, Google expects the client to be authorized via the Cloud Console.
       },
       body: JSON.stringify(requestBody),
     }
