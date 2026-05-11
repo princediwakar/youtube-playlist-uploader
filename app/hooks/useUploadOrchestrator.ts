@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { MediaFile, UploadSettings, YouTubePlaylistVideo } from '@/app/types/video'
 import { generateTitle, getBasename, calculateInsertionPositions } from '@/app/utils/videoHelpers'
 import type { UploadQueueItem } from './useVideoUpload'
+import { createPlaylist } from '@/app/actions/playlist'
 
 interface OrchestratorDeps {
   session: { accessToken?: string } | null
@@ -117,23 +118,13 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
                 throw new Error('Please enter a playlist name')
               }
 
-              const playlistResponse = await fetch('/api/youtube/playlist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title: uploadSettings.playlistName,
-                  description: '',
-                  privacyStatus: uploadSettings.privacyStatus
-                })
-              })
+              const result = await createPlaylist(
+                uploadSettings.playlistName,
+                '',
+                uploadSettings.privacyStatus
+              )
 
-              if (!playlistResponse.ok) {
-                const error = await playlistResponse.json()
-                throw new Error(error.details || 'Failed to create playlist')
-              }
-
-              const { playlistId: newPlaylistId } = await playlistResponse.json()
-              playlistId = newPlaylistId
+              const playlistId = result.playlistId
               setCurrentPlaylistId(playlistId)
               activeExistingVideos = []
             }

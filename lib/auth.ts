@@ -1,9 +1,17 @@
-import GoogleProvider from 'next-auth/providers/google'
-import type { NextAuthOptions } from 'next-auth'
+import NextAuth from 'next-auth'
+import Google from 'next-auth/providers/google'
 
-export const authOptions: NextAuthOptions = {
+interface TokenWithExtras {
+  accessToken?: string
+  refreshToken?: string
+  accessTokenExpires?: number
+  error?: string
+  [key: string]: unknown
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    GoogleProvider({
+    Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
@@ -24,26 +32,24 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, account, user: _user }) {
-      // Persist the OAuth access_token and refresh_token to the token right after signin
+    async jwt({ token, account }) {
+      const t = token as TokenWithExtras
       if (account) {
-        token.accessToken = account.access_token
-        token.refreshToken = account.refresh_token
-        token.accessTokenExpires = account.expires_at
+        t.accessToken = account.access_token
+        t.refreshToken = account.refresh_token
+        t.accessTokenExpires = account.expires_at
       }
 
-      // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.accessTokenExpires as number) * 1000) {
+      if (Date.now() < (t.accessTokenExpires as number) * 1000) {
         return token
       }
 
-      // Access token has expired, try to update it
-      return refreshAccessToken(token)
+      return refreshAccessToken(t)
     },
     async session({ session, token }) {
-      // Send properties to the client
-      session.accessToken = token.accessToken as string
-      session.error = token.error as string
+      const t = token as TokenWithExtras
+      session.accessToken = t.accessToken as string
+      session.error = t.error as string
       return session
     },
   },
@@ -51,11 +57,9 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
     error: '/auth/error'
   }
-}
+})
 
-import type { JWT } from 'next-auth/jwt'
-
-async function refreshAccessToken(token: JWT) {
+async function refreshAccessToken(token: TokenWithExtras): Promise<TokenWithExtras> {
   try {
     const url = 'https://oauth2.googleapis.com/token'
 
@@ -67,7 +71,7 @@ async function refreshAccessToken(token: JWT) {
         client_id: process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
         grant_type: 'refresh_token',
-        refresh_token: token.refreshToken,
+        refresh_token: token.refreshToken as string,
       }),
       method: 'POST',
     })
@@ -85,7 +89,6 @@ async function refreshAccessToken(token: JWT) {
       refreshToken: refreshedTokens.refresh_token ?? token.refreshToken,
     }
   } catch {
-
     return {
       ...token,
       error: 'RefreshAccessTokenError',

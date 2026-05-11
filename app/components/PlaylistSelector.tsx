@@ -2,7 +2,8 @@
 
 import { ChevronDown } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { useUploadContext } from '@/app/hooks/UploadContext'
+import { usePlaylistContext } from '@/app/contexts/PlaylistContext'
+import { useSettingsContext } from '@/app/contexts/SettingsContext'
 
 const YOUTUBE_PLAYLIST_ID_REGEX = /^(PL|LL|UL|FL|OL)[a-zA-Z0-9_-]{31,}$/
 
@@ -18,16 +19,17 @@ export function formatPlaylistId(playlistId: string): string {
 export function PlaylistSelector() {
   const { data: session } = useSession()
   const {
-    uploadSettings,
-    setUploadSettings,
     availablePlaylists,
     loadingPlaylists,
     fetchUserPlaylists,
     fetchExistingPlaylistVideos,
     clearPlaylistCache,
-    clearPlaylistVideosCache,
-    setExistingPlaylistVideos
-  } = useUploadContext()
+    setExistingPlaylistVideos,
+  } = usePlaylistContext()
+  const {
+    uploadSettings,
+    setUploadSettings,
+  } = useSettingsContext()
 
   if (uploadSettings.uploadMode !== 'playlist') {
     return null
@@ -45,7 +47,6 @@ export function PlaylistSelector() {
               <button
                 onClick={() => {
                   clearPlaylistCache()
-                  clearPlaylistVideosCache()
                   setExistingPlaylistVideos([])
                 }}
                 className="ml-3 text-yt-blue hover:text-[#65b8ff] font-medium"
@@ -56,7 +57,7 @@ export function PlaylistSelector() {
           )}
           {session && !loadingPlaylists && availablePlaylists.length === 0 && (
             <button
-              onClick={() => fetchUserPlaylists(true)}
+              onClick={() => fetchUserPlaylists(session.accessToken || '', true)}
               className="text-xs text-yt-blue hover:text-[#65b8ff] font-medium"
             >
               Load Playlists
@@ -94,8 +95,8 @@ export function PlaylistSelector() {
             checked={uploadSettings.useExistingPlaylist}
             onChange={() => {
               setUploadSettings(prev => ({ ...prev, useExistingPlaylist: true }))
-              if (availablePlaylists.length === 0 && !loadingPlaylists) {
-                fetchUserPlaylists()
+              if (availablePlaylists.length === 0 && !loadingPlaylists && session?.accessToken) {
+                fetchUserPlaylists(session.accessToken)
               }
             }}
             className="sr-only"
@@ -137,8 +138,8 @@ export function PlaylistSelector() {
                 onChange={(e) => {
                   const playlistId = e.target.value
                   setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
-                  if (playlistId) {
-                    fetchExistingPlaylistVideos(playlistId)
+                  if (playlistId && session?.accessToken) {
+                    fetchExistingPlaylistVideos(session.accessToken, playlistId)
                   } else {
                     setExistingPlaylistVideos([])
                   }
@@ -161,12 +162,14 @@ export function PlaylistSelector() {
               <div className="p-3 bg-red-900/10 rounded-lg border border-red-900/30 text-sm text-yt-text-secondary">
                 <span className="text-yt-red mr-2 font-medium">Notice:</span>
                 No playlists found.
-                <button
-                  onClick={() => fetchUserPlaylists(true)}
-                  className="text-yt-text-primary hover:text-yt-blue ml-2 font-medium"
-                >
-                  Try Again
-                </button>
+                {session?.accessToken && (
+                  <button
+                    onClick={() => fetchUserPlaylists(session.accessToken, true)}
+                    className="text-yt-text-primary hover:text-yt-blue ml-2 font-medium"
+                  >
+                    Try Again
+                  </button>
+                )}
               </div>
 
               <div className="p-4 bg-yt-panel border border-yt-border rounded-lg">
@@ -183,7 +186,9 @@ export function PlaylistSelector() {
                           const isValid = validatePlaylistId(playlistId)
                           if (isValid) {
                             setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
-                            fetchExistingPlaylistVideos(playlistId)
+                            if (session?.accessToken) {
+                              fetchExistingPlaylistVideos(session.accessToken, playlistId)
+                            }
                           }
                         }
                       }}
@@ -196,7 +201,9 @@ export function PlaylistSelector() {
                     onClick={() => {
                       const playlistId = 'PLExdYlNNwoiS7KfsjlIy3UHY69r0Qy-e5'
                       setUploadSettings(prev => ({ ...prev, selectedPlaylistId: playlistId }))
-                      fetchExistingPlaylistVideos(playlistId)
+                      if (session?.accessToken) {
+                        fetchExistingPlaylistVideos(session.accessToken, playlistId)
+                      }
                     }}
                     className="px-3 sm:px-4 py-2 bg-transparent border border-yt-border rounded-lg text-yt-text-secondary hover:text-yt-text-primary hover:border-yt-text-secondary text-xs sm:text-sm whitespace-nowrap transition-colors flex-shrink-0"
                   >

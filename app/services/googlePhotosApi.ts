@@ -118,6 +118,24 @@ export class GooglePhotosService {
     return response.json()
   }
 
+  async getMediaUrl(mediaId: string): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/mediaItems/${mediaId}`, {
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new GooglePhotosApiError(
+        `Failed to get media URL: HTTP ${response.status}`,
+        response.status
+      )
+    }
+
+    const data = await response.json()
+    return data.baseUrl
+  }
+
   async downloadMedia(baseUrl: string): Promise<Buffer> {
     const downloadUrl = `${baseUrl}=dv`
 

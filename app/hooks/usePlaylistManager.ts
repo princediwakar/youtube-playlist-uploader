@@ -3,15 +3,16 @@
 import { useState, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { PlaylistItem, YouTubePlaylistVideo } from '@/app/types/video'
+import { getPlaylists, getPlaylistVideos } from '@/app/actions/playlist'
+
+// Cache constants — module scope so useCallback deps are stable across renders
+const PLAYLIST_CACHE_KEY = 'youtube_playlists_cache'
+const PLAYLIST_CACHE_DURATION = 30 * 60 * 1000 // 30 minutes in milliseconds
+const PLAYLIST_VIDEOS_CACHE_KEY = 'youtube_playlist_videos_cache'
+const PLAYLIST_VIDEOS_CACHE_DURATION = 15 * 60 * 1000 // 15 minutes in milliseconds
 
 export function usePlaylistManager() {
   const { data: session } = useSession()
-
-  // Cache constants
-  const PLAYLIST_CACHE_KEY = 'youtube_playlists_cache'
-  const PLAYLIST_CACHE_DURATION = 30 * 60 * 1000 // 30 minutes in milliseconds
-  const PLAYLIST_VIDEOS_CACHE_KEY = 'youtube_playlist_videos_cache'
-  const PLAYLIST_VIDEOS_CACHE_DURATION = 15 * 60 * 1000 // 15 minutes in milliseconds
 
   // State
   const [availablePlaylists, setAvailablePlaylists] = useState<PlaylistItem[]>([])
@@ -46,7 +47,7 @@ export function usePlaylistManager() {
       localStorage.removeItem(PLAYLIST_CACHE_KEY)
       return null
     }
-  }, [PLAYLIST_CACHE_KEY, PLAYLIST_CACHE_DURATION])
+  }, [])
 
   const setCachedPlaylists = useCallback((playlists: PlaylistItem[]) => {
     try {
@@ -59,7 +60,7 @@ export function usePlaylistManager() {
     } catch (error) {
       console.error('Error caching playlists:', error)
     }
-  }, [PLAYLIST_CACHE_KEY])
+  }, [])
 
   const clearPlaylistCache = useCallback(() => {
     try {
@@ -68,7 +69,7 @@ export function usePlaylistManager() {
     } catch (error) {
       console.error('Error clearing playlist cache:', error)
     }
-  }, [PLAYLIST_CACHE_KEY])
+  }, [])
 
   // Playlist videos cache utility functions
   const getCachedPlaylistVideos = useCallback((playlistId: string): { videos: YouTubePlaylistVideo[], timestamp: number } | null => {
@@ -94,7 +95,7 @@ export function usePlaylistManager() {
       localStorage.removeItem(`${PLAYLIST_VIDEOS_CACHE_KEY}_${playlistId}`)
       return null
     }
-  }, [PLAYLIST_VIDEOS_CACHE_KEY, PLAYLIST_VIDEOS_CACHE_DURATION])
+  }, [])
 
   const setCachedPlaylistVideos = useCallback((playlistId: string, videos: YouTubePlaylistVideo[]) => {
     try {
@@ -108,7 +109,7 @@ export function usePlaylistManager() {
     } catch (error) {
       console.error('Error caching playlist videos:', error)
     }
-  }, [PLAYLIST_VIDEOS_CACHE_KEY])
+  }, [])
 
   const clearPlaylistVideosCache = useCallback((playlistId?: string) => {
     try {
@@ -129,7 +130,7 @@ export function usePlaylistManager() {
     } catch (error) {
       console.error('Error clearing playlist videos cache:', error)
     }
-  }, [PLAYLIST_VIDEOS_CACHE_KEY])
+  }, [])
 
   // Fetch user playlists
   const fetchUserPlaylists = useCallback(async (forceRefresh = false) => {
@@ -148,57 +149,30 @@ export function usePlaylistManager() {
       setLoadingPlaylists(true)
       console.log('Fetching user playlists...')
 
-      const response = await fetch('/api/youtube/playlist', {
-        method: 'GET'
+      const result = await getPlaylists()
+
+      console.log('Playlist response:', {
+        success: result.success,
+        playlistsCount: result.playlists?.length
       })
 
-      console.log('Playlist response status:', response.status)
+      const playlists = result.playlists || []
+      setAvailablePlaylists(playlists)
 
-      if (response.ok) {
-        const data = await response.json()
-        console.log('Playlist data received:', {
-          success: data.success,
-          playlistsCount: data.playlists?.length,
-          playlists: data.playlists?.map((p: PlaylistItem) => ({ id: p.id, title: p.snippet?.title })),
-          isMockData: data.isMockData
-        })
+      // Cache the playlists
+      setCachedPlaylists(playlists)
 
-        const playlists = data.playlists || []
-        setAvailablePlaylists(playlists)
-
-        // Cache the playlists (only if not mock data)
-        if (!data.isMockData) {
-          setCachedPlaylists(playlists)
-        }
-
-        // Show notification if using mock data
-        if (data.isMockData) {
-          alert('⚠️ Using mock playlist data due to YouTube API quota exceeded. This is for development purposes only.')
-        }
-      } else {
-        let errorData: Record<string, unknown> = {}
-        try {
-          errorData = await response.json()
-        } catch {
-          errorData = { error: response.statusText }
-        }
-        console.error('Failed to fetch playlists:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        })
-
-        // Show user-friendly error message for quota issues
-        if (response.status === 429 || (typeof errorData.error === 'string' && errorData.error.includes('quota'))) {
-          alert('YouTube API quota exceeded. Please try again tomorrow or request a quota increase from Google Cloud Console.')
-        } else if (response.status === 401) {
-          alert('Authentication expired. Please sign out and sign in again.')
-        } else {
-          alert(`Failed to fetch playlists: ${errorData.details || errorData.error || 'Unknown error'}`)
-        }
-      }
     } catch (error) {
       console.error('Error fetching playlists:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch playlists'
+      
+      if (errorMessage.includes('quota') || errorMessage.includes('quotaExceeded')) {
+        alert('YouTube API quota exceeded. Please try again tomorrow or request a quota increase from Google Cloud Console.')
+      } else if (errorMessage.includes('expired') || errorMessage.includes('unauthorized')) {
+        alert('Authentication expired. Please sign out and sign in again.')
+      } else {
+        alert(`Failed to fetch playlists: ${errorMessage}`)
+      }
     } finally {
       setLoadingPlaylists(false)
     }
@@ -219,23 +193,13 @@ export function usePlaylistManager() {
 
     try {
       setLoadingExistingVideos(true)
-      const response = await fetch(`/api/youtube/playlist-videos?playlistId=${playlistId}`, {
-        method: 'GET'
-      })
+      const result = await getPlaylistVideos(playlistId)
+      const videos = result.videos || []
+      setExistingPlaylistVideos(videos)
 
-      if (response.ok) {
-        const data = await response.json()
-        const videos = data.videos || []
-        setExistingPlaylistVideos(videos)
-
-        // Cache the playlist videos
-        setCachedPlaylistVideos(playlistId, videos)
-        return videos
-      } else {
-        console.error('Failed to fetch existing playlist videos')
-        setExistingPlaylistVideos([])
-        return []
-      }
+      // Cache the playlist videos
+      setCachedPlaylistVideos(playlistId, videos)
+      return videos
     } catch (error) {
       console.error('Error fetching existing playlist videos:', error)
       setExistingPlaylistVideos([])

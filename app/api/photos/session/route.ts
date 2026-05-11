@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
+import { auth } from '../../../../lib/auth'
 import { GooglePhotosService, GooglePhotosApiError, PickedMediaItem } from '../../../../app/services/googlePhotosApi'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
+  const session = await auth()
   if (!session?.accessToken) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   }

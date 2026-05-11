@@ -1,8 +1,7 @@
 import './globals.css'
 import { Inter, Playfair_Display } from 'next/font/google'
 import type { Metadata } from 'next'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import Providers from './providers'
 
 const inter = Inter({
@@ -38,7 +37,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await getServerSession(authOptions)
+  const session = await auth()
 
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>

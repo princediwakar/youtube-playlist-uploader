@@ -1,21 +1,21 @@
 'use client'
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { Upload, FolderOpen, Image, AlertTriangle } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Upload, FolderOpen, Image, AlertTriangle, RotateCcw } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
-import { UploadSettings, isVideoFile } from '@/app/types/video'
+import { isVideoFile } from '@/app/types/video'
 import type { GooglePhotosImportItem } from '@/app/types/googlePhotos'
 import { extractPlaylistName } from '@/app/utils/videoHelpers'
 import GooglePhotosPicker from '@/app/components/GooglePhotosPicker'
 import { CompactFileBar } from '@/app/components/CompactFileBar'
 import { UploadSettingsPanel } from '@/app/components/UploadSettingsPanel'
 import { UploadProgress } from '@/app/components/UploadProgress'
-import { useFileHandling } from '@/app/hooks/useFileHandling'
-import { usePlaylistManager } from '@/app/hooks/usePlaylistManager'
+import { useFileContext } from '@/app/contexts/FileContext'
+import { usePlaylistContext } from '@/app/contexts/PlaylistContext'
+import { useSettingsContext } from '@/app/contexts/SettingsContext'
 import { useVideoUpload } from '@/app/hooks/useVideoUpload'
-import { useUploadOrchestrator } from '@/app/hooks/useUploadOrchestrator'
-import UploadContext from '@/app/hooks/UploadContext'
+import { getFileFromHandle, isFileHandleSupported } from '@/app/store'
 import type { Session } from 'next-auth'
 
 interface UploadScreenProps {
@@ -23,49 +23,17 @@ interface UploadScreenProps {
 }
 
 export default function UploadScreen({ session }: UploadScreenProps) {
+  const { videos, setVideos, replaceVideos, addVideos, hasStoredFiles, restoreSession, clearSession } = useFileContext()
+  usePlaylistContext()
+  const { isUploading, quotaWarning, clearQuotaWarning, uploadVideos } = useVideoUpload()
+  const { uploadSettings, setUploadSettings, setCurrentPlaylistId, authError, setAuthError } = useSettingsContext()
 
-  const {
-    videos, setVideos, addVideos, replaceVideos, removeVideo,
-    updateVideoStatus, resetVideoStatuses,
-  } = useFileHandling()
-  const {
-    availablePlaylists, loadingPlaylists,
-    existingPlaylistVideos, loadingExistingVideos,
-    setExistingPlaylistVideos, fetchUserPlaylists,
-    fetchExistingPlaylistVideos, clearPlaylistCache, clearPlaylistVideosCache,
-  } = usePlaylistManager()
-  const {
-    isUploading, isPaused, currentUpload, uploadQueue,
-    uploadStats, quotaWarning,
-    pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
-    uploadVideos, addNavigationLinks,
-  } = useVideoUpload()
-
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false)
-  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null)
-  const [authError, setAuthError] = useState<string | null>(null)
   const [isPhotosPickerOpen, setIsPhotosPickerOpen] = useState(false)
   const [isUploadCardsExpanded, setIsUploadCardsExpanded] = useState(true)
+  const [showRestoreSession, setShowRestoreSession] = useState(false)
   const [isTouchDevice] = useState(() => {
     if (typeof window === 'undefined') return false
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0
-  })
-  const [uploadSettings, setUploadSettings] = useState<UploadSettings>({
-    playlistName: '',
-    privacyStatus: 'private',
-    maxVideos: 10,
-    contentType: 'auto',
-    uploadMode: 'playlist',
-    madeForKids: false,
-    category: '27',
-    titleFormat: 'cleaned',
-    customTitlePrefix: '',
-    customTitleSuffix: '',
-    addPlaylistNavigation: true,
-    useExistingPlaylist: false,
-    selectedPlaylistId: '',
-    audioCategory: '10',
-    generateAudioFrames: true,
   })
 
   // Auto-detect Shorts after media analysis completes
@@ -79,15 +47,14 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     if (!allAnalyzed) return
     if (videoFiles.every(v => v.isShort)) {
       shortsDetectedRef.current = true
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to async analysis completion
       setUploadSettings(prev => ({ ...prev, uploadMode: 'individual' }))
     }
-  }, [videos])
+  }, [videos, setUploadSettings])
 
   // Reset Shorts detection when files are replaced
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     shortsDetectedRef.current = false
-    const { added: newVideos, errors } = replaceVideos(acceptedFiles)
+    const { added: newVideos, errors } = await replaceVideos(acceptedFiles)
 
     if (errors.length > 0) {
       console.error('File validation errors:', errors)
@@ -103,7 +70,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
       const playlistName = rootFolder !== 'Root' ? rootFolder : extractPlaylistName(newVideos[0].name)
       setUploadSettings(prev => ({ ...prev, playlistName }))
     }
-  }, [uploadSettings.playlistName, replaceVideos])
+  }, [uploadSettings.playlistName, replaceVideos, setCurrentPlaylistId, setUploadSettings])
 
   const { getRootProps, getInputProps, isDragActive, open: openFileDialog } = useDropzone({
     onDrop,
@@ -118,7 +85,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     onDrop(files)
   }
 
-  const handleGooglePhotosImport = useCallback((items: GooglePhotosImportItem[]) => {
+  const handleGooglePhotosImport = useCallback(async (items: GooglePhotosImportItem[]) => {
     shortsDetectedRef.current = false
 
     const placeholderFiles = items.map(item => {
@@ -126,7 +93,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
       return new File([new Blob()], `${item.filename || item.id}.${ext}`, { type: item.mimeType })
     })
 
-    replaceVideos(placeholderFiles)
+    await replaceVideos(placeholderFiles)
 
     setVideos(prev => prev.map(v => {
       const match = items.find(item =>
@@ -138,6 +105,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         ...v,
         googlePhotosMediaId: match.id,
         googlePhotosBaseUrl: match.baseUrl,
+        googlePhotosFetchedAt: match.fetchedAt,
         name: match.filename || v.name,
         size: 'Google Photos',
       }
@@ -147,43 +115,34 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     setIsUploadCardsExpanded(false)
   }, [replaceVideos, setVideos])
 
-  const { handleOptimizedUpload } = useUploadOrchestrator({
-    session,
-    videos,
-    setVideos,
-    uploadSettings,
-    setCurrentPlaylistId,
-    setAuthError,
-    fetchExistingPlaylistVideos,
-    setExistingPlaylistVideos,
-    clearPlaylistCache,
-    clearPlaylistVideosCache,
-    uploadVideos,
-    addNavigationLinks,
-    cancelUpload,
-    clearQuotaWarning,
-  })
+  const handleOptimizedUpload = useCallback(async () => {
+    if (!session?.accessToken) {
+      setAuthError('Please sign in to upload videos')
+      return
+    }
 
-  const contextValue = useMemo(() => ({
-    videos, setVideos, addVideos, replaceVideos, removeVideo, updateVideoStatus, resetVideoStatuses,
-    availablePlaylists, loadingPlaylists, existingPlaylistVideos, loadingExistingVideos,
-    setExistingPlaylistVideos, fetchUserPlaylists, fetchExistingPlaylistVideos,
-    clearPlaylistCache, clearPlaylistVideosCache,
-    isUploading, isPaused, currentUpload, uploadQueue, uploadStats, quotaWarning,
-    pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
-    uploadSettings, setUploadSettings, showAdvancedSettings, setShowAdvancedSettings,
-    currentPlaylistId, setCurrentPlaylistId, authError, setAuthError,
-    handleOptimizedUpload,
-  }), [
-    videos, setVideos, addVideos, replaceVideos, removeVideo, updateVideoStatus, resetVideoStatuses,
-    availablePlaylists, loadingPlaylists, existingPlaylistVideos, loadingExistingVideos,
-    setExistingPlaylistVideos, fetchUserPlaylists, fetchExistingPlaylistVideos,
-    clearPlaylistCache, clearPlaylistVideosCache,
-    isUploading, isPaused, currentUpload, uploadQueue, uploadStats, quotaWarning,
-    pauseUpload, resumeUpload, cancelUpload, clearQuotaWarning,
-    uploadSettings, showAdvancedSettings, currentPlaylistId, authError,
-    handleOptimizedUpload,
-  ])
+    const videosToUpload = videos.filter(v => v.status === 'pending')
+    if (videosToUpload.length === 0) return
+
+    const playlistId = uploadSettings.useExistingPlaylist ? uploadSettings.selectedPlaylistId : undefined
+
+    const queue: import('@/app/hooks/useVideoUpload').UploadQueueItem[] = videosToUpload.map((video, idx) => ({
+      video,
+      metadata: {
+        title: video.name,
+        description: video.duration ? `Duration: ${Math.floor(video.duration / 60)}:${Math.floor(video.duration % 60).toString().padStart(2, '0')}` : '',
+        tags: [],
+        category: uploadSettings.category,
+      },
+      position: idx,
+    }))
+
+    await uploadVideos(
+      queue,
+      uploadSettings,
+      playlistId
+    )
+  }, [session, videos, uploadSettings, uploadVideos, setAuthError])
 
   // Compute upload button disabled state
   const isUploadDisabled =
@@ -195,8 +154,55 @@ export default function UploadScreen({ session }: UploadScreenProps) {
 
   const hasFiles = videos.length > 0
 
+  // Check for stored files on mount
+  useEffect(() => {
+    hasStoredFiles().then(hasStored => {
+      setShowRestoreSession(hasStored)
+    })
+  }, [hasStoredFiles])
+
+  const handleRestoreSession = useCallback(async () => {
+    const { handles, metadata } = await restoreSession()
+
+    let restoredFiles: File[] = []
+
+    if (isFileHandleSupported && handles && handles.length > 0) {
+      const validHandles = handles.filter((h): h is FileSystemFileHandle => 
+        h && typeof h === 'object' && 'kind' in h && (h as FileSystemFileHandle).kind === 'file'
+      )
+
+      if (validHandles.length > 0) {
+        const filePromises = validHandles.map(async (handle) => {
+          try {
+            return await getFileFromHandle(handle)
+          } catch (error) {
+            console.warn('Failed to get file from handle:', error)
+            return null
+          }
+        })
+
+        const files = await Promise.all(filePromises)
+        restoredFiles = files.filter((f): f is File => f !== null)
+
+        if (restoredFiles.length > 0) {
+          await addVideos(restoredFiles)
+          await clearSession()
+          setShowRestoreSession(false)
+          return
+        }
+      }
+    }
+
+    if (metadata && metadata.length > 0) {
+      alert(`Found ${metadata.length} previously uploaded files. Please re-select your files to continue the session.`)
+    }
+    
+    await clearSession()
+    setShowRestoreSession(false)
+  }, [restoreSession, clearSession, addVideos])
+
   return (
-    <UploadContext.Provider value={contextValue}>
+    <>
       {/* Error Banners */}
       {authError && (
         <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-900/20 border border-red-700 rounded-lg">
@@ -398,7 +404,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
 
       {/* Main layout: Settings + Progress */}
       {hasFiles ? (
-        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start pb-20 lg:pb-0">
           {/* Settings Column */}
           <div className="lg:col-span-7">
             <UploadSettingsPanel />
@@ -410,7 +416,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
           </div>
 
           {/* Mobile fixed bottom upload bar */}
-          <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-yt-bg/95 backdrop-blur-md border-t border-yt-border px-4 py-3">
+          <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-yt-bg/95 backdrop-blur-md border-t border-yt-border px-4 py-3 pb-safe shadow-lg">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm text-yt-text-secondary min-w-0">
                 <span className="font-medium text-yt-text-primary">{videos.filter(v => v.status === 'pending').length}</span>
@@ -447,6 +453,27 @@ export default function UploadScreen({ session }: UploadScreenProps) {
           onImport={handleGooglePhotosImport}
         />
       )}
-    </UploadContext.Provider>
+
+      {/* Restore Session Banner */}
+      {showRestoreSession && !hasFiles && (
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-900/20 border border-blue-700 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-start sm:items-center">
+              <RotateCcw className="mr-2 sm:mr-3 text-blue-500 flex-shrink-0 mt-0.5 sm:mt-0" size={18} />
+              <div>
+                <p className="text-blue-300 font-medium text-sm sm:text-base">Previous session found</p>
+                <p className="text-blue-400 text-xs sm:text-sm mt-1">Restore your files and continue uploading where you left off.</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleRestoreSession} 
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm self-end sm:self-auto flex-shrink-0"
+            >
+              Restore Session
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

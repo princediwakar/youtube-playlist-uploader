@@ -2,6 +2,7 @@
 
 import { SessionProvider } from 'next-auth/react'
 import type { Session } from 'next-auth'
+import { FileProvider, PlaylistProvider, UploadProvider, SettingsProvider } from '@/app/contexts'
 
 export default function Providers({
   children,
@@ -12,7 +13,15 @@ export default function Providers({
 }) {
   return (
     <SessionProvider session={session}>
-      {children}
+      <FileProvider>
+        <PlaylistProvider>
+          <UploadProvider>
+            <SettingsProvider>
+              {children}
+            </SettingsProvider>
+          </UploadProvider>
+        </PlaylistProvider>
+      </FileProvider>
     </SessionProvider>
   )
 }

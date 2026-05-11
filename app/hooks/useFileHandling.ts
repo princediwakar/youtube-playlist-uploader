@@ -51,7 +51,12 @@ function createMediaFile(file: File): MediaFile {
   const folderPath = pathParts.slice(0, -1).join('/')
   const rootFolder = pathParts[0] || 'Root'
   const detectedType = detectMediaType(file)
-  const mediaType = detectedType === 'unknown' ? 'video' : detectedType
+
+  if (detectedType === 'unknown') {
+    return null
+  }
+
+  const mediaType = detectedType
 
   return {
     file,
@@ -94,20 +99,16 @@ function mergeAnalysisResult(v: MediaFile, analysis: AnalysisResult): MediaFile 
 
 function startAnalysisForFiles(
   newMediaFiles: MediaFile[],
-  pendingAnalysisRef: React.MutableRefObject<Map<string, { startIndex: number; relativeIndex: number }>>,
-  getTargetIndex: (storedRef: { startIndex: number; relativeIndex: number } | undefined, relativeIndex: number) => number,
+  pendingAnalysisRef: React.MutableRefObject<Map<string, unknown>>,
   setVideos: React.Dispatch<React.SetStateAction<MediaFile[]>>,
 ) {
-  newMediaFiles.forEach((mediaFile, relativeIndex) => {
-    const storedRef = pendingAnalysisRef.current.get(mediaFile.path)
-    const targetIndex = getTargetIndex(storedRef, relativeIndex)
-
+  newMediaFiles.forEach((mediaFile) => {
     analyzeMedia(mediaFile.file)
       .then(analysis => {
         pendingAnalysisRef.current.delete(mediaFile.path)
         setVideos(currentVideos =>
-          currentVideos.map((v, i) =>
-            i === targetIndex ? mergeAnalysisResult(v, analysis) : v
+          currentVideos.map(v =>
+            v.path === mediaFile.path ? mergeAnalysisResult(v, analysis) : v
           )
         )
       })
@@ -142,7 +143,6 @@ export function useFileHandling() {
     newMediaFiles.sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
 
     const startIndex = videos.length
-
     newMediaFiles.forEach((mediaFile, relativeIndex) => {
       pendingAnalysisRef.current.set(mediaFile.path, { startIndex, relativeIndex })
     })
@@ -152,10 +152,6 @@ export function useFileHandling() {
     startAnalysisForFiles(
       newMediaFiles,
       pendingAnalysisRef,
-      (storedRef, relativeIndex) => {
-        const actualStartIndex = storedRef?.startIndex ?? startIndex
-        return actualStartIndex + (storedRef?.relativeIndex ?? relativeIndex)
-      },
       setVideos
     )
 
@@ -195,7 +191,6 @@ export function useFileHandling() {
     startAnalysisForFiles(
       newMediaFiles,
       pendingAnalysisRef,
-      (storedRef, relativeIndex) => storedRef?.relativeIndex ?? relativeIndex,
       setVideos
     )
 

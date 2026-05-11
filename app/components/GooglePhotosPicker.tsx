@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { X, AlertTriangle, Loader2, ExternalLink, Monitor } from 'lucide-react'
 import type { GooglePhotosImportItem } from '@/app/types/googlePhotos'
+import { createPhotosSession } from '@/app/actions/photos'
+import type { PickedMediaItem } from '@/app/services/googlePhotosApi'
 
 interface GooglePhotosPickerProps {
   isOpen: boolean
@@ -11,20 +13,6 @@ interface GooglePhotosPickerProps {
 }
 
 type PickerStatus = 'creating' | 'picking' | 'retrieving' | 'done'
-
-interface PickedMediaFile {
-  baseUrl: string
-  mimeType: string
-  filename: string
-  mediaFileMetadata?: { width?: number; height?: number }
-}
-
-interface RawPickedItem {
-  id: string
-  createTime?: string
-  type?: string
-  mediaFile: PickedMediaFile
-}
 
 function isMobileBrowser(): boolean {
   if (typeof window === 'undefined') return false
@@ -67,7 +55,6 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
     setError(null)
     setNeedsReauth(false)
 
-    // Google Photos Picker API is not supported on mobile browsers
     if (isMobileBrowser()) {
       isMobileRef.current = true
       setError('Google Photos Picker requires a desktop browser. Please switch to a desktop or laptop computer to import videos from Google Photos.')
@@ -79,43 +66,35 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
 
     const run = async () => {
       try {
-        // 1. Open blank tab FIRST while still in user-gesture context,
-        //    so the browser doesn't block the popup. We navigate it to
-        //    the picker URL once the session is created.
         pickerWindowRef.current = window.open('about:blank', '_blank')
 
-        // 2. Create picker session
-        const createRes = await fetch('/api/photos/create-session', { method: 'POST' })
-
-        if (createRes.status === 403) {
-          const data = await createRes.json()
-          if (data.needsReauth) {
+        let sessionData: { sessionId: string; pickerUri: string }
+        try {
+          sessionData = await createPhotosSession()
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err)
+          if (errorMessage.includes('403') || errorMessage.includes('Photos permission')) {
             setNeedsReauth(true)
             setError('Google Photos permission required. Please sign out and sign in again to grant access.')
+            if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
+              pickerWindowRef.current.close()
+              pickerWindowRef.current = null
+            }
+            return
           }
           if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
             pickerWindowRef.current.close()
             pickerWindowRef.current = null
           }
-          return
-        }
-        if (!createRes.ok) {
-          const data = await createRes.json().catch(() => ({}))
-          const serverError = data?.error || data?.details || `HTTP ${createRes.status}`
-          if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
-            pickerWindowRef.current.close()
-            pickerWindowRef.current = null
-          }
-          throw new Error(serverError)
+          throw err
         }
 
-        const { sessionId, pickerUri } = await createRes.json()
+        const { sessionId, pickerUri } = sessionData
         sessionIdRef.current = sessionId
         setStatus('picking')
 
         if (cancelled) return
 
-        // 3. Navigate the already-open tab to the picker URL
         const pickerUrl = pickerUri.endsWith('/') ? `${pickerUri}autoclose` : `${pickerUri}/autoclose`
         if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
           pickerWindowRef.current.location.href = pickerUrl
@@ -123,11 +102,10 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
           pickerWindowRef.current = window.open(pickerUrl, '_blank')
         }
 
-        // 4. Poll until the user finishes picking
         let attempts = 0
-        const maxAttempts = 150 // 5 minutes max
+        const maxAttempts = 150
         let windowClosedAttempts = 0
-        const maxWindowClosedAttempts = 30 // 30s after window closes
+        const maxWindowClosedAttempts = 30
 
         const poll = async (): Promise<void> => {
           if (cancelled || abortedRef.current) return
@@ -147,39 +125,25 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
           }
 
           try {
-            const res = await fetch(`/api/photos/session?sessionId=${sessionId}`)
-            if (!res.ok) {
-              const err = await res.json().catch(err => {
-                console.error('Failed to parse session response:', err)
-                return {}
-              })
-              if (err.needsReauth) {
-                setNeedsReauth(true)
-                setError('Google Photos permission required. Please sign out and sign in again to grant access.')
-                return
-              }
-              throw new Error(err.error || 'Failed to check session')
-            }
-
-            const data = await res.json()
+            const { pollPhotosSession } = await import('@/app/actions/photos')
+            const data = await pollPhotosSession(sessionId)
 
             if (!data.ready) {
-              // Poll faster once the window closes, so we pick up Done quickly
               const delay = pickerWindowRef.current?.closed ? 1000 : 2000
               pollTimerRef.current = setTimeout(poll, delay)
               return
             }
 
-            // Session complete — map items and import
             setStatus('retrieving')
 
             const videoItems: GooglePhotosImportItem[] = (data.mediaItems || [])
-              .filter((item: RawPickedItem) => item.type === 'VIDEO' || item.mediaFile?.mimeType?.startsWith('video/'))
-              .map((item: RawPickedItem) => ({
+              .filter((item: PickedMediaItem) => item.type === 'VIDEO' || item.mediaFile?.mimeType?.startsWith('video/'))
+              .map((item: PickedMediaItem) => ({
                 id: item.id,
                 filename: item.mediaFile.filename || item.id,
                 mimeType: item.mediaFile.mimeType,
                 baseUrl: item.mediaFile.baseUrl,
+                fetchedAt: data.fetchedAt || new Date().toISOString(),
                 creationTime: item.createTime || '',
                 width: item.mediaFile.mediaFileMetadata?.width || 0,
                 height: item.mediaFile.mediaFileMetadata?.height || 0,
@@ -223,20 +187,20 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-yt-border">
-          <h3 className="text-lg font-medium text-yt-text-primary">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-yt-border">
+          <h3 className="text-base sm:text-lg font-medium text-yt-text-primary">
             Google Photos
           </h3>
           <button
             onClick={handleClose}
-            className="p-1 rounded-lg hover:bg-yt-hover text-yt-text-secondary hover:text-yt-text-primary transition-colors"
+            className="w-11 h-11 rounded-lg flex items-center justify-center text-yt-text-secondary hover:bg-yt-hover hover:text-yt-text-primary transition-colors touch-manipulation"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-5 sm:p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           {/* Reauth banner */}
           {needsReauth && error && (
             <div className="p-4 bg-red-900/20 border border-red-700 rounded-lg">

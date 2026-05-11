@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession, signIn, signOut } from 'next-auth/react'
-import { Youtube, User, LogOut } from 'lucide-react'
+import { Youtube, User, LogOut, History } from 'lucide-react'
 import LandingPage from '@/app/components/LandingPage'
 import UploadScreen from '@/app/components/UploadScreen'
 import type { Session } from 'next-auth'
@@ -51,6 +51,13 @@ export default function AppShell({ session }: AppShellProps) {
                       Connected
                     </span>
                   </div>
+                  <a
+                    href="/history"
+                    className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"
+                  >
+                    <History className="mr-1.5 sm:mr-2" size={14} />
+                    <span className="hidden sm:inline">History</span>
+                  </a>
                   <button
                     onClick={() => signOut()}
                     className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"

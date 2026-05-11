@@ -3,21 +3,24 @@
 import { ChevronDown, Check, Database } from 'lucide-react'
 import { PlaylistSelector } from './PlaylistSelector'
 import { isVideoFile, isAudioFile } from '@/app/types/video'
-import { useUploadContext } from '@/app/hooks/UploadContext'
+import { useFileContext } from '@/app/contexts/FileContext'
+import { usePlaylistContext } from '@/app/contexts/PlaylistContext'
+import { useSettingsContext } from '@/app/contexts/SettingsContext'
 
 export function UploadSettingsPanel() {
+  const { videos } = useFileContext()
   const {
-    videos,
-    uploadSettings,
-    setUploadSettings,
     availablePlaylists,
     existingPlaylistVideos,
+    clearPlaylistCache,
+    setExistingPlaylistVideos,
+  } = usePlaylistContext()
+  const {
+    uploadSettings,
+    setUploadSettings,
     showAdvancedSettings,
     setShowAdvancedSettings,
-    clearPlaylistCache,
-    clearPlaylistVideosCache,
-    setExistingPlaylistVideos
-  } = useUploadContext()
+  } = useSettingsContext()
 
   if (videos.length === 0) {
     return null
@@ -91,22 +94,71 @@ export function UploadSettingsPanel() {
 
       <PlaylistSelector />
 
-      {/* Visibility */}
-      <div className="mb-4 sm:mb-6">
-        <label className="block text-sm font-medium text-yt-text-primary mb-2">
-          Visibility
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+        {/* Visibility */}
+        <div>
+          <label className="block text-sm font-medium text-yt-text-primary mb-2">
+            Visibility
+          </label>
+          <div className="relative">
+            <select
+              value={uploadSettings.privacyStatus}
+              onChange={(e) => setUploadSettings(prev => ({
+                ...prev, privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
+              }))}
+              className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
+            >
+              <option value="private">Private</option>
+              <option value="unlisted">Unlisted</option>
+              <option value="public">Public</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
+              <ChevronDown size={16} />
+            </div>
+          </div>
+        </div>
+
+        {/* Batch Size - moved outside collapsible */}
+        <div>
+          <label className="block text-sm font-medium text-yt-text-primary mb-2">
+            Batch Size
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="50"
+            value={uploadSettings.maxVideos}
+            onChange={(e) => setUploadSettings(prev => ({
+              ...prev, maxVideos: parseInt(e.target.value) || 10
+            }))}
+            className="w-full px-4 py-2.5 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none text-sm"
+          />
+          <span className="text-[10px] text-yt-text-secondary mt-1 block">Max videos per batch (1-50)</span>
+        </div>
+      </div>
+
+      {/* Video Category - moved outside collapsible */}
+      <div className="mt-6 pt-4 border-t border-yt-border">
+        <label className="block text-sm font-medium text-yt-text-primary mb-2 flex items-center justify-between">
+          <span>Video Category</span>
+          {uploadSettings.category !== '27' && <span className="text-yt-blue text-[10px] bg-yt-blue/10 px-1.5 py-0.5 rounded">Customized</span>}
         </label>
         <div className="relative">
           <select
-            value={uploadSettings.privacyStatus}
-            onChange={(e) => setUploadSettings(prev => ({
-              ...prev, privacyStatus: e.target.value as 'private' | 'unlisted' | 'public'
-            }))}
+            value={uploadSettings.category}
+            onChange={(e) => setUploadSettings(prev => ({ ...prev, category: e.target.value }))}
             className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
           >
-            <option value="private">Private</option>
-            <option value="unlisted">Unlisted</option>
-            <option value="public">Public</option>
+            <option value="27">27: Education</option>
+            <option value="28">28: Sci-Tech</option>
+            <option value="26">26: HowTo & Style</option>
+            <option value="22">22: People & Blogs</option>
+            <option value="25">25: News & Politics</option>
+            <option value="24">24: Entertainment</option>
+            <option value="19">19: Travel & Events</option>
+            <option value="17">17: Sports</option>
+            <option value="15">15: Pets & Animals</option>
+            <option value="10">10: Music</option>
           </select>
           <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
             <ChevronDown size={16} />
@@ -115,7 +167,7 @@ export function UploadSettingsPanel() {
       </div>
 
       {/* Advanced Settings */}
-      <div className="mt-8 pt-6 border-t border-yt-border">
+      <div className="mt-6 pt-4 border-t border-yt-border">
         <button
           type="button"
           onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
@@ -130,23 +182,6 @@ export function UploadSettingsPanel() {
 
         {showAdvancedSettings && (
           <div className="mt-4 p-4 sm:p-6 bg-[#F9F9F9] rounded-xl border border-yt-border grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
-            {/* Batch Size */}
-            <div>
-              <label className="block text-sm font-medium text-yt-text-primary mb-2">
-                Batch Size
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={uploadSettings.maxVideos}
-                onChange={(e) => setUploadSettings(prev => ({
-                  ...prev, maxVideos: parseInt(e.target.value) || 10
-                }))}
-                className="w-full px-4 py-2.5 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none text-sm"
-              />
-              <span className="text-[10px] text-yt-text-secondary mt-1 block">Max videos per batch (1-50)</span>
-            </div>
 
             {/* Made for Kids */}
             <div className="flex items-start space-x-3 group">
@@ -247,53 +282,24 @@ export function UploadSettingsPanel() {
             <div className="sm:col-span-2 pt-6 border-t border-yt-border flex flex-col sm:flex-row items-start sm:items-center justify-between">
               <div className="flex items-center text-xs text-yt-text-secondary">
                 <Database size={14} className="mr-2" />
-                <span>Local Cache: </span>
-                <span className="ml-1 text-yt-text-primary">Playlists: {availablePlaylists.length} | Videos: {existingPlaylistVideos.length}</span>
+                <span>Playlist Cache: </span>
+                <span className="ml-1 text-yt-text-primary">{availablePlaylists.length} playlists, {existingPlaylistVideos.length} videos</span>
               </div>
 
               <button
                 onClick={() => {
                   clearPlaylistCache()
-                  clearPlaylistVideosCache()
                   setExistingPlaylistVideos([])
-                  alert('Cache cleared.')
+                  alert('Playlist cache cleared.')
                 }}
                 className="text-sm font-medium text-yt-red hover:text-red-400 mt-3 sm:mt-0 transition-colors"
               >
-                Clear specific cache
+                Clear playlist cache
               </button>
             </div>
 
-            {/* Dropdowns for Categories and Layouts */}
+            {/* Dropdowns for Title Format */}
             <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-4 sm:pt-6 border-t border-yt-border">
-              <div>
-                <label className="block text-sm font-medium text-yt-text-primary mb-2 flex items-center justify-between">
-                  <span>Video Category</span>
-                  {uploadSettings.category !== '27' && <span className="text-yt-blue text-[10px] bg-yt-blue/10 px-1.5 py-0.5 rounded">Customized</span>}
-                </label>
-                <div className="relative">
-                  <select
-                    value={uploadSettings.category}
-                    onChange={(e) => setUploadSettings(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-4 py-3 bg-yt-bg text-yt-text-primary rounded-lg border border-yt-border focus:border-yt-blue focus:ring-0 focus:outline-none appearance-none cursor-pointer"
-                  >
-                    <option value="27">27: Education</option>
-                    <option value="28">28: Sci-Tech</option>
-                    <option value="26">26: HowTo & Style</option>
-                    <option value="22">22: People & Blogs</option>
-                    <option value="25">25: News & Politics</option>
-                    <option value="24">24: Entertainment</option>
-                    <option value="19">19: Travel & Events</option>
-                    <option value="17">17: Sports</option>
-                    <option value="15">15: Pets & Animals</option>
-                    <option value="10">10: Music</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-yt-text-secondary">
-                    <ChevronDown size={16} />
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-yt-text-primary mb-2">
                   Title Format

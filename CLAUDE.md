@@ -1,98 +1,71 @@
-# CLAUDE.md
+# CLAUDE.md — 12-rule template
 
-# SYSTEM DIRECTIVE: YOUTUBE PLAYLIST UPLOADER ARCHITECTURAL STANDARD
+These rules apply to every task in this project unless explicitly overridden.
+Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
 
-**CURRENT STATE MANDATE:** We are executing a strict Server-First, Next.js App Router architecture. Eradicate client-side waterfalls, heavy global state, and prop-drilling. Prioritize server components, URL-driven state, and strict decoupling. Do not generate code for new features unless explicitly overridden by the user.
+## Rule 1 — Think Before Coding
+State assumptions explicitly. If uncertain, ask rather than guess.
+Present multiple interpretations when ambiguity exists.
+Push back when a simpler approach exists.
+Stop when confused. Name what's unclear.
 
----
+## Rule 2 — Simplicity First
+Minimum code that solves the problem. Nothing speculative.
+No features beyond what was asked. No abstractions for single-use code.
+Test: would a senior engineer say this is overcomplicated? If yes, simplify.
 
-## TIER 1: BEHAVIORAL CORE (How You Operate)
+## Rule 3 — Surgical Changes
+Touch only what you must. Clean up only your own mess.
+Don't "improve" adjacent code, comments, or formatting.
+Don't refactor what isn't broken. Match existing style.
 
-### 1. Think Like a Systems Architect
-**Don't just write code; design the data flow.**
-- State your assumptions explicitly. If uncertain, STOP and ask.
-- Always ask: "Can this be done on the server instead of the client?"
-- If a simpler, less abstract approach exists, push back and suggest it.
+## Rule 4 — Goal-Driven Execution
+Define success criteria. Loop until verified.
+Don't follow steps. Define success and iterate.
+Strong success criteria let you loop independently.
 
-### 2. Simplicity & Deletion
-**Code is a liability. The best PR is a negative line count.**
-- No abstractions for single-use code.
-- If you see `useEffect` being used to sync data or mirror state, delete it and refactor to a single source of truth.
-- Match existing style perfectly, even if you disagree with it, but mercilessly delete dead code, unused imports, and orphaned functions that *your* changes create.
+## Rule 5 — Use the model only for judgment calls
+Use me for: classification, drafting, summarization, extraction.
+Do NOT use me for: routing, retries, deterministic transforms.
+If code can answer, code answers.
 
-### 3. Goal-Driven Execution
-**Define success criteria. Loop until verified.**
-- Transform tasks into verifiable goals.
-- For multi-step tasks, state a brief checklist before executing.
+## Rule 6 — Token budgets are not advisory
+Per-task: 4,000 tokens. Per-session: 30,000 tokens.
+If approaching budget, summarize and start fresh.
+Surface the breach. Do not silently overrun.
 
----
+## Rule 7 — Surface conflicts, don't average them
+If two patterns contradict, pick one (more recent / more tested).
+Explain why. Flag the other for cleanup.
+Don't blend conflicting patterns.
 
-## TIER 2: ARCHITECTURE & DATA FLOW (The Hard Boundaries)
-*Violating these rules introduces catastrophic performance degradation. Do not bypass them under any circumstances.*
+## Rule 8 — Read before you write
+Before adding code, read exports, immediate callers, shared utilities.
+"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
 
-### A. The Server-First Mandate
-- **Pages are Server Components:** `page.tsx` files MUST NOT have `"use client"`. Pages are orchestrators. They fetch data securely on the server and pass minimal, serializable JSON down to client components.
-- **Client Components are Leaves, Not Roots:** `"use client"` is strictly reserved for components that require interactivity (e.g., `onClick`, `useState`, Drag & Drop via `react-dropzone`, browser APIs like `window`). Push client boundaries as far down the component tree as possible.
-- **No Client-Side Waterfalls:** Do not fetch initial data in `useEffect` unless explicitly required for polling or high-frequency updates (e.g., upload progress).
+## Rule 9 — Tests verify intent, not just behavior
+Tests must encode WHY behavior matters, not just WHAT it does.
+A test that can't fail when business logic changes is wrong.
 
-### B. Mutations via API Routes & Server Actions
-- **No Direct Client-Side Third-Party Mutations:** Stop writing direct YouTube API or DeepSeek API calls in React client components.
-- **Action Layer:** All mutations (YouTube uploads, playlist creation, AI metadata generation) must happen via Next.js API Routes (`app/api/`) or Server Actions. Client components should call these endpoints, which securely authenticate via NextAuth, handle the logic, and return typed results.
+## Rule 10 — Checkpoint after every significant step
+Summarize what was done, what's verified, what's left.
+Don't continue from a state you can't describe back.
+If you lose track, stop and restate.
 
-### C. State Management Hierarchy
-- **Level 1: The URL (Single Source of Truth):** Filters, search queries, pagination, and active tabs MUST live in the URL (`searchParams`). Read them on the server or use `useSearchParams`.
-- **Level 2: React State (`useState`):** Use for strictly local, ephemeral component state (e.g., open/close a specific dropdown).
-- **Level 3: Custom Hooks & Context:** Use ONLY for complex, cross-component transient UI state that cannot live in the URL (e.g., upload queue orchestration). Rely on existing hooks like `useFileHandling`, `usePlaylistManager`, and `useVideoUpload`. Do not introduce external state management like Zustand or Redux.
+## Rule 11 — Match the codebase's conventions, even if you disagree
+Conformance > taste inside the codebase.
+If you genuinely think a convention is harmful, surface it. Don't fork silently.
 
----
+## Rule 12 — Fail loud
+"Completed" is wrong if anything was skipped silently.
+"Tests pass" is wrong if any were skipped.
+Default to surfacing uncertainty, not hiding it.
 
-## TIER 3: CODE QUALITY & ERROR HANDLING
+## Rule 13 — Ruthless Architectural Constraints (YouTube Uploader)
+These are non-negotiable project boundaries based on `PLAN.md`. DO NOT deviate from them.
 
-### A. Component Design
-- **Stop Prop Drilling:** If you are passing more than 4 props down multiple levels, stop. Use React Context, or better yet, use Component Composition (pass `<Child/>` as `children` to `<Parent/>`).
-- **Hook Limits:** Maximum 5 `useState`/`useEffect` combinations per file. If larger, the component is doing too much. Split it.
-
-### B. Type Safety (Strict Adherence)
-- **Central Hub:** `app/types/` and `types/` are the master directories. Domain types like `Video`, `MediaFile`, `UploadSession`, and `YouTubePlaylist` live here.
-- **No `any`:** The `@typescript-eslint/no-explicit-any` rule is enforced. Use `unknown` and narrow. No new `any` casts are allowed.
-
-### C. Error & Loading UI Standardization
-- **Error Visibility:** Do not swallow errors. Catch blocks in client code must display visible feedback to the user. Return standard error objects `{ error: string }` from API routes.
-- **No Silent Failures:** Never use `.catch(() => ({}))`.
-
----
-
-## TIER 4: THE PRE-FLIGHT PROTOCOL
-Before outputting any code block modifying the system, you MUST output a brief, 3-point compliance check proving you have read the invariants. 
-
-*Example format:*
-`> Pre-flight Check: 1. Component moved to Server. 2. URL used as state instead of local state. 3. Mutation extracted to API Route.`
-
----
-
-## PROJECT SPECIFICS & COMMANDS
-
-### Commands
-- `npm run dev` – Start Next.js development server
-- `npm run build` – Build for production
-- `npm run start` – Start production server
-- `npm run lint` – Run ESLint
-
-### Core Stack
-- **Framework**: Next.js 14 App Router, React 19, TypeScript
-- **Styling**: Tailwind CSS with custom refined luxury palette
-- **Auth**: NextAuth.js with Google OAuth
-- **APIs**: YouTube Data API v3 (`googleapis`), DeepSeek API (via OpenAI client)
-- **Media**: FFmpeg (`fluent-ffmpeg`, `@ffmpeg-installer/ffmpeg`) for video/audio processing
-
-### Important Context
-- **Media Handling**: The app processes both video and audio. Ensure FFmpeg wrappers in `app/utils/ffmpegWrapper.ts` are utilized properly.
-- **API Quotas**: YouTube API upload consumes ~1,600 quota units per video (10,000 daily default). The codebase must respect session limits and avoid redundant API calls.
-- **Large Uploads**: `/api/youtube/upload/route.ts` is configured for long durations in `vercel.json` (300 seconds).
-
-### Directory Overview
-- `app/api/` - Domain grouped APIs (`audio/`, `auth/`, `youtube/`)
-- `app/components/` - React components including landing page and upload interfaces
-- `app/hooks/` - Core upload/playlist state logic
-- `app/services/` - `aiService.ts` and `youtubeApi.ts` business logic
-- `app/utils/` - FFmpeg, media helpers, and audio workers
+1. **Zero-Egress Uploads:** Vercel NEVER touches media bytes. All uploads must go directly from the browser to YouTube using resumable URIs (via `ChunkedUploader`). Do not buffer files in server memory or serverless functions.
+2. **Server Actions over API Routes:** Use Next.js Server Actions for all database mutations and state changes. Only use `app/api/...` routes for webhooks or direct-to-YouTube proxying.
+3. **State Management:** The upload queue is governed by Zustand + IndexedDB. Do not create new React Contexts for global state. Do not rely on React state to survive a tab closure.
+4. **Strict FFmpeg Isolation:** Do not attempt to run `ffmpeg.wasm` in the main application thread. It requires strict COOP/COEP headers that will kill Google OAuth popups. All FFmpeg processing must occur inside a dedicated, isolated `<iframe>` communicating only via `postMessage`.
+5. **Authentication:** We use Auth.js v5. Do not use legacy NextAuth v4 patterns (e.g., `getServerSession`). Use `await auth()` everywhere on the server.

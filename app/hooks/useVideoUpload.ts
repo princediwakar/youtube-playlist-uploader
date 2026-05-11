@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import { MediaFile, UploadSettings, isVideoFile, isAudioFile } from '@/app/types/video'
 import type { BaseMediaFile } from '@/app/types/media'
 import { generateAudioFrame } from '@/app/utils/audioHelpers'
-import { uploadToYouTubeResumable } from '@/app/utils/youtubeResumableUpload'
+import { uploadToYouTubeResumable, uploadBlobToYouTubeResumable, ChunkedUploader } from '@/app/utils/chunkedUploader'
+import { completeUpload } from '@/app/actions/playlist'
+import { addNavigationLinksSingle } from '@/app/actions/navigation'
+import { recordUpload } from '@/app/actions/history'
+import { useAppStore } from '@/app/store'
+import { useFfmpegEngine, type EngineOptions } from '@/app/hooks/useFfmpegEngine'
 
 export interface UploadQueueItem {
   video: MediaFile
@@ -30,35 +35,37 @@ export interface UploadStats {
 export function useVideoUpload() {
   const { data: session } = useSession()
 
-  // Upload state
-  const [isUploading, setIsUploading] = useState(false)
-  const [isPaused, setIsPaused] = useState(false)
-  const [currentUpload, setCurrentUpload] = useState<string | null>(null)
-  const [uploadQueue, setUploadQueue] = useState<UploadQueueItem[]>([])
-  const [uploadStats, setUploadStats] = useState<UploadStats | null>(null)
-  const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
+  const isUploading = useAppStore((s) => s.isUploading)
+  const isPaused = useAppStore((s) => s.isPaused)
+  const currentUpload = useAppStore((s) => s.currentUpload)
+  const uploadQueue = useAppStore((s) => s.uploadQueue)
+  const uploadStats = useAppStore((s) => s.uploadStats)
+  const quotaWarning = useAppStore((s) => s.quotaWarning)
+  const setIsUploading = useAppStore((s) => s.setIsUploading)
+  const setIsPaused = useAppStore((s) => s.setIsPaused)
+  const setCurrentUpload = useAppStore((s) => s.setCurrentUpload)
+  const setUploadQueue = useAppStore((s) => s.setUploadQueue)
+  const setUploadStats = useAppStore((s) => s.setUploadStats)
+  const setQuotaWarning = useAppStore((s) => s.setQuotaWarning)
 
-  // Refs for upload control
   const isPausedRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const statsRef = useRef<UploadStats | null>(null)
+  const ffmpegConvert = useFfmpegEngine()
 
   const MAX_RETRIES = 3
-  const RETRY_DELAYS = [1000, 5000, 15000] // Exponential backoff
+  const RETRY_DELAYS = [1000, 5000, 15000]
 
-  // Pause upload
   const pauseUpload = useCallback(() => {
     isPausedRef.current = true
     setIsPaused(true)
-  }, [])
+  }, [setIsPaused])
 
-  // Resume upload
   const resumeUpload = useCallback(() => {
     isPausedRef.current = false
     setIsPaused(false)
-  }, [])
+  }, [setIsPaused])
 
-  // Cancel upload
   const cancelUpload = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -71,10 +78,8 @@ export function useVideoUpload() {
     setUploadQueue([])
     setCurrentUpload(null)
     setUploadStats(null)
-    // Note: quotaWarning is NOT cleared here to preserve quota error messages
-  }, [])
+  }, [setIsPaused, setIsUploading, setUploadQueue, setCurrentUpload, setUploadStats])
 
-  // Retry a failed upload with exponential backoff
   const retryWithBackoff = useCallback(async <T,>(
     fn: () => Promise<T>,
     maxRetries: number = MAX_RETRIES
@@ -93,21 +98,16 @@ export function useVideoUpload() {
       } catch (error) {
         lastError = error as Error
 
-        // Don't retry on certain errors
         if (error instanceof Error) {
-          // Quota errors - don't retry
           if (error.message.includes('quota') || error.message.includes('QUOTA_EXCEEDED') || error.message.includes('quotaExceeded')) {
             throw error
           }
-          // Auth errors - don't retry
           if (error.message.includes('unauthorized') || error.message.includes('expired')) {
             throw error
           }
-          // User aborted - don't retry
           if (error.name === 'AbortError') {
             throw error
           }
-          // Payload too large - don't retry (will never succeed)
           if (error.message.includes('413') || error.message.includes('too large') || error.message.includes('Request Entity')) {
             throw error
           }
@@ -118,7 +118,6 @@ export function useVideoUpload() {
     throw lastError || new Error('Max retries exceeded')
   }, [])
 
-  // Helper function to convert data URL to File
   const dataURLtoFile = (dataUrl: string, filename: string): File => {
     const arr = dataUrl.split(',')
     const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg'
@@ -131,7 +130,13 @@ export function useVideoUpload() {
     return new File([u8arr], filename, { type: mime })
   }
 
-  // Upload a single video
+  const getVideoProps = (video: MediaFile): { isShort: boolean; aspectRatio: number } => {
+    if (video.mediaType === 'video') {
+      return { isShort: video.isShort || false, aspectRatio: video.aspectRatio || 1.78 }
+    }
+    return { isShort: false, aspectRatio: 1.78 }
+  }
+
   const uploadVideo = useCallback(async (
     video: MediaFile,
     metadata: {
@@ -151,35 +156,72 @@ export function useVideoUpload() {
     setCurrentUpload(video.name)
 
     try {
-      // Video files: upload directly from client to YouTube (bypasses Vercel body limits)
       const isGooglePhotos = !!(video as BaseMediaFile).googlePhotosMediaId
-      if (isVideoFile(video) && !isGooglePhotos) {
+      const videoProps = getVideoProps(video)
+
+      if (isVideoFile(video)) {
         try {
-          const videoId = await uploadToYouTubeResumable(
-            video.file,
-            {
-              title: metadata.title,
-              description: metadata.description,
-              tags: metadata.tags,
-              categoryId: metadata.category,
-              privacyStatus: uploadSettings.privacyStatus,
-              madeForKids: uploadSettings.madeForKids,
-              isShort: isVideoFile(video) ? (video.isShort || false) : false,
-            },
-            undefined,
-            abortControllerRef.current?.signal
-          )
+          let videoId: string
+
+          if (isGooglePhotos) {
+            const googlePhotosVideo = video as BaseMediaFile
+            const googlePhotosFetchedAt = (video as BaseMediaFile).googlePhotosFetchedAt
+              ? new Date((video as BaseMediaFile).googlePhotosFetchedAt!).getTime()
+              : undefined
+            const uploader = new ChunkedUploader(
+              {
+                type: 'googlePhotos',
+                size: googlePhotosVideo.file?.size || 0,
+                googlePhotosMediaId: googlePhotosVideo.googlePhotosMediaId!,
+                googlePhotosBaseUrl: googlePhotosVideo.googlePhotosBaseUrl!,
+                googlePhotosFetchedAt,
+                accessToken: session.accessToken,
+              },
+              {
+                title: metadata.title,
+                description: metadata.description,
+                tags: metadata.tags,
+                categoryId: metadata.category,
+                privacyStatus: uploadSettings.privacyStatus,
+                madeForKids: uploadSettings.madeForKids,
+                isShort: videoProps.isShort,
+              },
+              null,
+              undefined,
+              abortControllerRef.current?.signal
+            )
+            videoId = await uploader.upload()
+          } else {
+            videoId = await uploadToYouTubeResumable(
+              video.file,
+              {
+                title: metadata.title,
+                description: metadata.description,
+                tags: metadata.tags,
+                categoryId: metadata.category,
+                privacyStatus: uploadSettings.privacyStatus,
+                madeForKids: uploadSettings.madeForKids,
+                isShort: videoProps.isShort,
+              },
+              undefined,
+              abortControllerRef.current?.signal
+            )
+          }
 
           setCurrentUpload(null)
 
-          // Add to playlist if needed (fire-and-forget — upload already succeeded)
           if (uploadSettings.uploadMode === 'playlist' && playlistId) {
-            fetch('/api/youtube/upload/complete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ videoId, playlistId, position }),
-            }).catch(err => console.error('Complete endpoint error:', err))
+            completeUpload(videoId, playlistId, position).catch(err => console.error('Complete error:', err))
           }
+
+          recordUpload({
+            videoId,
+            title: metadata.title,
+            playlistId,
+            fileName: video.name,
+            fileSize: video.file?.size || 0,
+            mediaType: video.mediaType
+          }).catch(err => console.error('Record upload error:', err))
 
           return { videoId, url: `https://www.youtube.com/watch?v=${videoId}` }
         } catch (error) {
@@ -188,14 +230,74 @@ export function useVideoUpload() {
         }
       }
 
-      // Audio files and Google Photos: use server-side upload (FFmpeg / download required)
-      // Upload video with pre-processed metadata
+      const { isShort, aspectRatio } = getVideoProps(video)
+
+      if (isAudioFile(video)) {
+        let videoBlob: Blob | null = null
+
+        if (ffmpegConvert.ready) {
+          try {
+            const engineOpts: EngineOptions = {
+              width: 1280,
+              height: 720,
+              waveformColor: '0xff3333',
+              backgroundColor: '0x0f0f0f',
+              textColor: '0xffffff',
+              fontSize: 28,
+              showMetadata: true,
+              fps: 25,
+              waveMode: 'cline',
+              metadata: {
+                title: metadata.title,
+              },
+            }
+            videoBlob = await ffmpegConvert.convert(video.file, engineOpts)
+          } catch (engineErr) {
+            console.warn('[upload] FFmpeg engine failed, falling back to server route:', engineErr)
+          }
+        }
+
+        if (videoBlob) {
+          const videoId = await uploadBlobToYouTubeResumable(
+            videoBlob,
+            video.name.replace(/\.[^/.]+$/, '') + '.mp4',
+            {
+              title: metadata.title,
+              description: metadata.description,
+              tags: metadata.tags,
+              categoryId: metadata.category,
+              privacyStatus: uploadSettings.privacyStatus,
+              madeForKids: uploadSettings.madeForKids,
+              isShort: false,
+            },
+            undefined,
+            abortControllerRef.current?.signal
+          )
+
+          setCurrentUpload(null)
+
+          if (uploadSettings.uploadMode === 'playlist' && playlistId) {
+            completeUpload(videoId, playlistId, position).catch(err => console.error('Complete error:', err))
+          }
+
+          recordUpload({
+            videoId,
+            title: metadata.title,
+            playlistId,
+            fileName: video.name,
+            fileSize: videoBlob.size,
+            mediaType: 'audio'
+          }).catch(err => console.error('Record upload error:', err))
+
+          return { videoId, url: `https://www.youtube.com/watch?v=${videoId}` }
+        }
+      }
+
       const formData = new FormData()
       formData.append('video', video.file)
       formData.append('title', metadata.title)
       formData.append('description', metadata.description)
       formData.append('tags', JSON.stringify(metadata.tags))
-      // Use pre-generated category from metadata (contains correct category for both audio and video)
       formData.append('category', metadata.category)
       if (playlistId) {
         formData.append('playlistId', playlistId)
@@ -206,9 +308,9 @@ export function useVideoUpload() {
       formData.append('privacyStatus', uploadSettings.privacyStatus)
       formData.append('madeForKids', uploadSettings.madeForKids.toString())
       formData.append('uploadMode', uploadSettings.uploadMode)
-      formData.append('isShort', (isVideoFile(video) ? (video.isShort || false) : false).toString())
+      formData.append('isShort', isShort.toString())
       formData.append('duration', (video.duration || 0).toString())
-      formData.append('aspectRatio', (isVideoFile(video) ? (video.aspectRatio || 1.78) : 1.78).toString())
+      formData.append('aspectRatio', aspectRatio.toString())
       formData.append('titleFormat', uploadSettings.titleFormat || 'original')
       formData.append('customTitlePrefix', uploadSettings.customTitlePrefix || '')
       formData.append('customTitleSuffix', uploadSettings.customTitleSuffix || '')
@@ -218,14 +320,11 @@ export function useVideoUpload() {
         formData.append('googlePhotosBaseUrl', (video as BaseMediaFile).googlePhotosBaseUrl!)
       }
 
-      // For audio files, generate thumbnail based on settings
       if (isAudioFile(video)) {
         let thumbnailDataUrl: string | undefined
 
         try {
-          // Generate enhanced audio frame if setting enabled and waveform available
           if (uploadSettings.generateAudioFrames && video.waveform && video.waveform.length > 0) {
-            // Generate enhanced audio frame with title, description, and metadata
             thumbnailDataUrl = generateAudioFrame(
               video.waveform,
               metadata.title,
@@ -245,23 +344,16 @@ export function useVideoUpload() {
                 }
               }
             )
-            console.log('Generated enhanced audio frame with waveform')
           } else if (video.audioThumbnail) {
-            // Use existing audioThumbnail (basic waveform)
             thumbnailDataUrl = video.audioThumbnail
-            console.log('Using existing audio thumbnail')
           }
 
           if (thumbnailDataUrl) {
             const thumbnailFile = dataURLtoFile(thumbnailDataUrl, 'audio-thumbnail.jpg')
             formData.append('thumbnail', thumbnailFile)
-            console.log('Added audio thumbnail to upload form')
-          } else {
-            console.log('No audio thumbnail available, backend will generate simple one')
           }
         } catch (thumbnailError) {
-          console.warn('Failed to generate or add audio thumbnail:', thumbnailError)
-          // Continue without thumbnail, backend will generate one
+          console.warn('Failed to generate audio thumbnail:', thumbnailError)
         }
       }
 
@@ -277,7 +369,6 @@ export function useVideoUpload() {
           const error = await response.json()
           errorMessage = error.details || error.error || errorMessage
         } catch {
-          // Response body is not JSON (e.g., Vercel's plain-text 413)
           const text = await response.text().catch(() => '')
           if (text) errorMessage = text
         }
@@ -290,14 +381,42 @@ export function useVideoUpload() {
 
       const result = await response.json()
       setCurrentUpload(null)
+
+      if (result.videoId) {
+        recordUpload({
+          videoId: result.videoId,
+          title: metadata.title,
+          playlistId,
+          fileName: video.name,
+          fileSize: video.file?.size || 0,
+          mediaType: video.mediaType
+        }).catch(err => console.error('Record upload error:', err))
+      }
+
       return result
     } catch (error) {
       setCurrentUpload(null)
       throw error
     }
-  }, [session?.accessToken])
+  }, [session?.accessToken, setCurrentUpload])
 
-  // Upload multiple videos with concurrency control and retry logic
+  const updateStats = useCallback((completed: number, uploadedBytes: number, total: number, startTime: number) => {
+    if (!statsRef.current) return
+
+    const elapsed = (Date.now() - startTime) / 1000
+    const progress = total > 0 ? completed / total : 0
+    const estimatedTotal = progress > 0 ? elapsed / progress : 0
+    const remaining = Math.max(0, estimatedTotal - elapsed)
+
+    statsRef.current = {
+      ...statsRef.current,
+      uploadedBytes,
+      uploadSpeed: elapsed > 0 ? uploadedBytes / elapsed : 0,
+      estimatedTimeRemaining: remaining
+    }
+    setUploadStats({ ...statsRef.current })
+  }, [setUploadStats])
+
   const uploadVideos = useCallback(async (
     queue: UploadQueueItem[],
     uploadSettings: UploadSettings,
@@ -310,7 +429,6 @@ export function useVideoUpload() {
       throw new Error('Not authenticated')
     }
 
-    // Initialize stats
     const startTime = Date.now()
     const totalBytes = queue.reduce((sum, item) => sum + (item.video.file?.size || 0), 0)
     statsRef.current = { totalBytes, uploadedBytes: 0, uploadSpeed: 0, estimatedTimeRemaining: 0, startTime }
@@ -329,16 +447,14 @@ export function useVideoUpload() {
     }
 
     let completedCount = 0
-    const failedItems: UploadQueueItem[] = []
+    let uploadedBytes = 0
 
     try {
       for (const chunk of chunks) {
-        // Check for pause
         while (isPausedRef.current) {
           await new Promise(resolve => setTimeout(resolve, 500))
         }
 
-        // Check for abort
         if (abortControllerRef.current?.signal.aborted) {
           console.log('Upload cancelled')
           break
@@ -349,9 +465,7 @@ export function useVideoUpload() {
           const retryCount = item.retryCount || 0
 
           try {
-            // Use retry logic for uploads
             const result = await retryWithBackoff(async () => {
-              // Check pause before retry
               while (isPausedRef.current) {
                 await new Promise(resolve => setTimeout(resolve, 500))
               }
@@ -359,7 +473,8 @@ export function useVideoUpload() {
             }, MAX_RETRIES - retryCount)
 
             completedCount++
-            updateStats(completedCount, queue.length, startTime)
+            uploadedBytes += video.file?.size || 0
+            updateStats(completedCount, uploadedBytes, queue.length, startTime)
             if (onProgress) {
               onProgress(completedCount, queue.length)
             }
@@ -370,20 +485,13 @@ export function useVideoUpload() {
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Upload failed'
 
-            // Check for quota errors
             const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('QUOTA') || errorMessage.includes('quotaExceeded')
             if (isQuotaError) {
               setQuotaWarning('YouTube API daily quota exceeded. Please try again tomorrow or reduce batch size.')
-              console.warn('Quota warning:', errorMessage)
             }
 
             if (onVideoError) {
               onVideoError(video, error as Error)
-            }
-
-            // Add to failed items for retry (skip quota errors as they are unrecoverable)
-            if (!isQuotaError) {
-              failedItems.push({ ...item, retryCount: retryCount + 1 })
             }
 
             return null
@@ -393,28 +501,6 @@ export function useVideoUpload() {
         await Promise.all(uploadPromises)
       }
 
-      // Retry failed items once more
-      if (failedItems.length > 0 && !abortControllerRef.current?.signal.aborted) {
-        console.log(`Retrying ${failedItems.length} failed uploads...`)
-        for (const item of failedItems) {
-          if (isPausedRef.current) {
-            while (isPausedRef.current) {
-              await new Promise(resolve => setTimeout(resolve, 500))
-            }
-          }
-
-          try {
-            const result = await uploadVideo(item.video, item.metadata, uploadSettings, playlistId, item.position)
-            completedCount++
-            if (onVideoComplete) {
-              onVideoComplete(item.video, result)
-            }
-          } catch (error) {
-            console.error(`Final retry failed for ${item.video.name}:`, error)
-          }
-        }
-      }
-
     } finally {
       setIsUploading(false)
       setIsPaused(false)
@@ -422,27 +508,8 @@ export function useVideoUpload() {
       setCurrentUpload(null)
       setUploadStats(null)
     }
-  }, [session?.accessToken, uploadVideo, retryWithBackoff])
+  }, [session?.accessToken, uploadVideo, retryWithBackoff, setIsUploading, setIsPaused, setUploadQueue, setCurrentUpload, setUploadStats, setQuotaWarning, updateStats])
 
-  // Helper to update stats
-  const updateStats = (completed: number, total: number, startTime: number) => {
-    if (!statsRef.current) return
-
-    const elapsed = (Date.now() - startTime) / 1000
-    const progress = completed / total
-    const estimatedTotal = elapsed / progress
-    const remaining = estimatedTotal - elapsed
-
-    statsRef.current = {
-      ...statsRef.current,
-      uploadedBytes: completed,
-      uploadSpeed: completed / elapsed,
-      estimatedTimeRemaining: remaining
-    }
-    setUploadStats({ ...statsRef.current })
-  }
-
-  // Add navigation links to uploaded video
   const addNavigationLinks = useCallback(async (
     videoId: string,
     playlistId: string,
@@ -452,31 +519,19 @@ export function useVideoUpload() {
     if (!session?.accessToken) return
 
     try {
-      await fetch('/api/youtube/add-navigation-single', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoId,
-          playlistId,
-          position,
-          title
-        })
-      })
+      await addNavigationLinksSingle(videoId, title, playlistId)
     } catch (error) {
       console.error('Navigation link failed for video:', videoId, error)
     }
   }, [session?.accessToken])
 
   return {
-    // State
     isUploading,
     isPaused,
     currentUpload,
     uploadQueue,
     uploadStats,
     quotaWarning,
-
-    // Functions
     uploadVideo,
     uploadVideos,
     addNavigationLinks,

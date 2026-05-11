@@ -3,6 +3,7 @@ export interface GooglePhotosImportItem {
   filename: string
   mimeType: string
   baseUrl: string
+  fetchedAt: string
   creationTime: string
   width: number
   height: number

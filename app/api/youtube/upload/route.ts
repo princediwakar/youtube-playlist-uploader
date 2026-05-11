@@ -1,10 +1,10 @@
 // app/api/youtube/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '../../../../lib/auth'
+import { auth } from '../../../../lib/auth'
 import { YouTubeApiService } from '../../../../app/services/youtubeApi'
 import { GooglePhotosService } from '../../../../app/services/googlePhotosApi'
 import path from 'path'
+import { rateLimit } from '../../../utils/rateLimit'
 
 import { convertAudioToVideo, convertAudioToWaveformVideo, generateSimpleAudioThumbnail } from '../../../../app/utils/ffmpegWrapper'
 
@@ -13,8 +13,17 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300 // 5 minutes for video uploads
 
 export async function POST(request: NextRequest) {
+  const rateLimitResult = rateLimit(request, { maxRequests: 30, windowMs: 60 * 1000 })
+  if (!rateLimitResult.success) {
+    const retryAfter = Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+    return NextResponse.json(
+      { error: 'Too many requests', retryAfter },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+    )
+  }
+
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
 
     if (!session?.accessToken) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })

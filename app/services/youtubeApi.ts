@@ -55,7 +55,7 @@ export class YouTubeApiService {
     const fs = await import('fs');
 
     try {
-      fs.writeFileSync(tempFilePath, fileBuffer)
+      await fs.promises.writeFile(tempFilePath, fileBuffer)
 
       const response = await this.youtube.videos.insert({
         part: ['snippet', 'status'],
@@ -87,7 +87,7 @@ export class YouTubeApiService {
       }
     } finally {
       try {
-        fs.unlinkSync(tempFilePath)
+        await fs.promises.unlink(tempFilePath)
       } catch (cleanupError) {
         console.error('Error cleaning up temp file:', cleanupError)
       }

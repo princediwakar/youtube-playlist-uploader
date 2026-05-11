@@ -1,7 +1,7 @@
 'use client'
 
 import { FolderOpen, Plus, Edit3, X } from 'lucide-react'
-import { useUploadContext } from '@/app/hooks/UploadContext'
+import { useFileContext } from '@/app/contexts/FileContext'
 
 interface CompactFileBarProps {
   onExpandCards: () => void
@@ -9,7 +9,7 @@ interface CompactFileBarProps {
 }
 
 export function CompactFileBar({ onExpandCards, onAddMore }: CompactFileBarProps) {
-  const { videos, removeVideo } = useUploadContext()
+  const { videos, removeVideo } = useFileContext()
 
   const folderCount = Array.from(new Set(videos.map(v => v.folder))).length
   const fileCount = videos.length
@@ -49,10 +49,11 @@ export function CompactFileBar({ onExpandCards, onAddMore }: CompactFileBarProps
         </button>
         <button
           onClick={() => {
-            // Remove all videos by removing each one
-            const count = videos.length
-            for (let i = count - 1; i >= 0; i--) {
-              removeVideo(i)
+            if (confirm(`Are you sure you want to clear all ${videos.length} files?`)) {
+              const count = videos.length
+              for (let i = count - 1; i >= 0; i--) {
+                removeVideo(i)
+              }
             }
           }}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm text-yt-red hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors ml-auto sm:ml-0"
