@@ -6,69 +6,91 @@ const ENGINE_HTML = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/></head>
 <body>
-<script type="module">
-let ffmpeg = null;
-let loaded = false;
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
+<script>
+(function() {
+  'use strict';
+  var ffmpeg = null;
+  var loaded = false;
 
-async function loadFfmpeg() {
-  if (loaded) return;
-  ffmpeg = new FFmpeg();
-  ffmpeg.on('log', ({ message }) => console.log('[engine]', message));
-  ffmpeg.on('progress', ({ progress }) => {
-    try { parent.postMessage({ type: 'progress', progress: Math.round(progress * 100) }, '*'); } catch {}
-  });
-  try {
-    await ffmpeg.load({
-      coreURL: URL.createObjectURL(await fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js').then(r => r.blob())),
-      wasmURL: URL.createObjectURL(await fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm').then(r => r.blob())),
+  function waitForFFmpeg(callback) {
+    var interval = setInterval(function() {
+      if (typeof FFmpegWASM !== 'undefined') {
+        clearInterval(interval);
+        callback(FFmpegWASM);
+      }
+    }, 50);
+    setTimeout(function() {
+      clearInterval(interval);
+      parent.postMessage({ type: 'error', error: 'ffmpeg-timeout' }, '*');
+    }, 10000);
+  }
+
+  function loadFfmpeg() {
+    if (loaded) return;
+    waitForFFmpeg(function(FFmpeg) {
+      ffmpeg = new FFmpeg();
+      ffmpeg.on('log', function(e) { console.log('[engine]', e.message); });
+      ffmpeg.on('progress', function(e) {
+        try { parent.postMessage({ type: 'progress', progress: Math.round(e.progress * 100) }, '*'); } catch {}
+      });
+      ffmpeg.load({
+        coreURL: URL.createObjectURL(fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js').then(function(r) { return r.blob(); })),
+        wasmURL: URL.createObjectURL(fetch('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm').then(function(r) { return r.blob(); }))
+      }).then(function() {
+        loaded = true;
+        parent.postMessage({ type: 'loaded' }, '*');
+      }).catch(function(err) {
+        parent.postMessage({ type: 'error', error: 'ffmpeg-load:' + (err && err.message || String(err)) }, '*');
+      });
     });
-    loaded = true;
-    parent.postMessage({ type: 'loaded' }, '*');
-  } catch (err) {
-    parent.postMessage({ type: 'error', error: 'ffmpeg-load:' + (err?.message || String(err)) }, '*');
-  }
-}
-
-async function convert(data, opts) {
-  const input = 'input.mp3';
-  const output = 'output.mp4';
-  const width = opts?.width ?? 1280;
-  const height = opts?.height ?? 720;
-  const fontSize = opts?.fontSize ?? 28;
-  const textColor = opts?.textColor ?? '0xffffff';
-  const bgColor = opts?.backgroundColor ?? '0x0f0f0f';
-  const waveColor = opts?.waveformColor ?? '0xff3333';
-  const showMeta = opts?.showMetadata ?? true;
-  const fps = opts?.fps ?? 25;
-  const meta = opts?.metadata ?? {};
-
-  await ffmpeg.writeFile(input, new Uint8Array(data));
-
-  let filter;
-  if (showMeta && meta?.title) {
-    const escaped = meta.title.replace(/'/g, "'\\''").replace(/:/g, '\\:');
-    filter = '[0:a]showwaves=s=' + width + 'x' + height + ':mode=cline:colors=' + waveColor + ':fps=' + fps + '[v];[v]drawtext=text=\\'' + escaped + '\\':fontsize=' + fontSize + ':fontcolor=' + textColor + ':x=(w-text_w)/2:y=' + (height - fontSize * 2) + ':borderw=2:bordercolor=0x000000@0.5';
-  } else {
-    filter = '[0:a]showwaves=s=' + width + 'x' + height + ':mode=cline:colors=' + waveColor + ':fps=' + fps + '[v]';
   }
 
-  try {
-    await ffmpeg.exec([
-      '-i', input,
-      '-filter_complex', filter,
-      '-map', '[v]',
-      '-frames:v', '150',
-      '-c:v', 'libx264',
-      '-preset', 'ultrafast',
-      '-crf', '28',
-      '-pix_fmt', 'yuv420p',
-      '-an',
-      output,
-    ]);
-  } catch (primaryErr) {
-    console.warn('[engine] primary filter failed, trying fallback:', primaryErr?.message);
-    try {
-      await ffmpeg.exec([
+  function convert(data, opts) {
+    var input = 'input.mp3';
+    var output = 'output.mp4';
+    var width = opts && opts.width ? opts.width : 1280;
+    var height = opts && opts.height ? opts.height : 720;
+    var fontSize = opts && opts.fontSize ? opts.fontSize : 28;
+    var textColor = opts && opts.textColor ? opts.textColor : '0xffffff';
+    var waveColor = opts && opts.waveformColor ? opts.waveformColor : '0xff3333';
+    var showMeta = opts && opts.showMetadata !== false;
+    var fps = opts && opts.fps ? opts.fps : 25;
+    var meta = opts && opts.metadata ? opts.metadata : {};
+    var id = opts && opts._id;
+
+    ffmpeg.writeFile(input, new Uint8Array(data)).then(function() {
+      var filter;
+      if (showMeta && meta && meta.title) {
+        var escaped = meta.title.replace(/'/g, "'\\''").replace(/:/g, '\\:');
+        filter = '[0:a]showwaves=s=' + width + 'x' + height + ':mode=cline:colors=' + waveColor + ':fps=' + fps + '[v];[v]drawtext=text=\\'' + escaped + '\\':fontsize=' + fontSize + ':fontcolor=' + textColor + ':x=(w-text_w)/2:y=' + (height - fontSize * 2) + ':borderw=2:bordercolor=0x000000@0.5';
+      } else {
+        filter = '[0:a]showwaves=s=' + width + 'x' + height + ':mode=cline:colors=' + waveColor + ':fps=' + fps + '[v]';
+      }
+
+      ffmpeg.exec([
+        '-i', input,
+        '-filter_complex', filter,
+        '-map', '[v]',
+        '-frames:v', '150',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '28',
+        '-pix_fmt', 'yuv420p',
+        '-an',
+        output,
+      ]).then(function() {
+        return ffmpeg.readFile(output);
+      }).then(function(out) {
+        ffmpeg.deleteFile(input);
+        ffmpeg.deleteFile(output);
+        parent.postMessage({ type: 'done', id: id, blob: Array.from(new Uint8Array(out)), blobSize: out.byteLength }, '*');
+      }).catch(function(readErr) {
+        parent.postMessage({ type: 'error', id: id, error: 'read:' + (readErr && readErr.message || String(readErr)) }, '*');
+      });
+    }).catch(function(primaryErr) {
+      console.warn('[engine] primary filter failed, trying fallback:', primaryErr && primaryErr.message);
+      ffmpeg.exec([
         '-i', input,
         '-filter_complex', '[0:a]showwaves=s=' + width + 'x' + height + ':mode=cline:colors=' + waveColor + ':fps=' + fps + '[v]',
         '-map', '[v]',
@@ -79,34 +101,33 @@ async function convert(data, opts) {
         '-pix_fmt', 'yuv420p',
         '-an',
         output,
-      ]);
-    } catch (fallbackErr) {
-      parent.postMessage({ type: 'error', id: opts._id, error: 'convert-failed:' + (fallbackErr?.message || String(fallbackErr)) }, '*');
-      return;
-    }
+      ]).then(function() {
+        return ffmpeg.readFile(output);
+      }).then(function(out) {
+        ffmpeg.deleteFile(input);
+        ffmpeg.deleteFile(output);
+        parent.postMessage({ type: 'done', id: id, blob: Array.from(new Uint8Array(out)), blobSize: out.byteLength }, '*');
+      }).catch(function(fallbackErr) {
+        parent.postMessage({ type: 'error', id: id, error: 'convert-failed:' + (fallbackErr && fallbackErr.message || String(fallbackErr)) }, '*');
+      });
+    });
   }
 
-  try {
-    const out = await ffmpeg.readFile(output);
-    await ffmpeg.deleteFile(input);
-    await ffmpeg.deleteFile(output);
-    parent.postMessage({ type: 'done', id: opts._id, blob: Array.from(new Uint8Array(out)), blobSize: out.byteLength }, '*');
-  } catch (readErr) {
-    parent.postMessage({ type: 'error', id: opts._id, error: 'read:' + (readErr?.message || String(readErr)) }, '*');
-  }
-}
-
-self.addEventListener('message', async (e) => {
-  const { type, id, file, options } = e.data;
+self.addEventListener('message', function(e) {
+  var data = e.data;
+  var type = data && data.type;
+  var id = data && data.id;
+  var file = data && data.file;
+  var options = data && data.options;
   if (type === 'init') {
-    await loadFfmpeg();
+    loadFfmpeg();
     return;
   }
   if (type === 'convert') {
-    const opts = Object.assign({}, options, { _id: id });
-    await convert(file, opts);
+    var opts = Object.assign({}, options, { _id: id });
+    convert(file, opts);
   }
-});
+})();
 
 parent.postMessage({ type: 'boot' }, '*');
 <\/script>
