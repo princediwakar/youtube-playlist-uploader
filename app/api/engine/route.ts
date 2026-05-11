@@ -91,7 +91,8 @@ function loadFfmpeg() {
       }).then(function(out) {
         ffmpeg.deleteFile(input);
         ffmpeg.deleteFile(output);
-        parent.postMessage({ type: 'done', id: id, blob: Array.from(new Uint8Array(out)), blobSize: out.byteLength }, '*');
+        var buffer = out.buffer;
+        parent.postMessage({ type: 'done', id: id, buffer: buffer, blobSize: out.byteLength }, '*', [buffer]);
       }).catch(function(readErr) {
         parent.postMessage({ type: 'error', id: id, error: 'read:' + (readErr && readErr.message || String(readErr)) }, '*');
       });
@@ -113,7 +114,8 @@ function loadFfmpeg() {
       }).then(function(out) {
         ffmpeg.deleteFile(input);
         ffmpeg.deleteFile(output);
-        parent.postMessage({ type: 'done', id: id, blob: Array.from(new Uint8Array(out)), blobSize: out.byteLength }, '*');
+        var buffer = out.buffer;
+        parent.postMessage({ type: 'done', id: id, buffer: buffer, blobSize: out.byteLength }, '*', [buffer]);
       }).catch(function(fallbackErr) {
         parent.postMessage({ type: 'error', id: id, error: 'convert-failed:' + (fallbackErr && fallbackErr.message || String(fallbackErr)) }, '*');
       });

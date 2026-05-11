@@ -1,3 +1,4 @@
+// app/hooks/useVideoUpload.ts
 'use client'
 
 import { useCallback, useRef } from 'react'

@@ -81,9 +81,10 @@ export async function analyzeAudio(file: File): Promise<{
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
     const reader = new FileReader()
 
-    reader.onload = async (e) => {
+    const processAudio = async () => {
       try {
-        const arrayBuffer = e.target?.result as ArrayBuffer
+        // Read only the first 5MB for analysis to save memory and avoid memory spikes
+        const arrayBuffer = await file.slice(0, 5 * 1024 * 1024).arrayBuffer()
 
         // Decode audio data
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
@@ -120,11 +121,7 @@ export async function analyzeAudio(file: File): Promise<{
       }
     }
 
-    reader.onerror = () => {
-      reject(new Error('Failed to read audio file'))
-    }
-
-    reader.readAsArrayBuffer(file)
+    processAudio()
   })
 }
 

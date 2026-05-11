@@ -11,7 +11,7 @@ type EngineIncoming =
   | { type: 'boot' }
   | { type: 'loaded' }
   | { type: 'progress'; progress: number }
-  | { type: 'done'; id: string; blob: number[]; blobSize: number }
+  | { type: 'done'; id: string; buffer: ArrayBuffer; blobSize: number }
   | { type: 'error'; id?: string; error: string }
 
 export interface EngineOptions {
@@ -118,8 +118,7 @@ export function useFfmpegEngine() {
         const job = pendingRef.current.get(e.data.id)
         if (job) {
           pendingRef.current.delete(e.data.id)
-          const uint8 = new Uint8Array(e.data.blob)
-          const blob = new Blob([uint8], { type: 'video/mp4' })
+          const blob = new Blob([e.data.buffer], { type: 'video/mp4' })
           job.resolve(blob)
         }
         return
@@ -179,7 +178,8 @@ export function useFfmpegEngine() {
           try {
             engine?.postMessage(
               { type: 'convert', id, file: ab, options: opts },
-              '*'
+              '*',
+              [ab]
             )
           } catch (err) {
             pendingRef.current.delete(id)

@@ -34,9 +34,10 @@ interface ResumableSession {
   googlePhotosFetchedAt?: number
 }
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB
-const SESSION_STORAGE_KEY_PREFIX = 'yt_upload_session_'
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB (5242880 = 256KB * 20480)
+const LOCAL_STORAGE_KEY_PREFIX = 'yt_upload_session_'
 const GOOGLE_PHOTOS_URL_EXPIRY_MS = 60 * 60 * 1000 // 60 minutes
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 export class ChunkedUploader {
   private source: ChunkedUploadSource
@@ -76,12 +77,12 @@ export class ChunkedUploader {
 
   private getSessionKey(): string {
     if (this.source.type === 'local' && this.file) {
-      return `${SESSION_STORAGE_KEY_PREFIX}local_${this.file.name}_${this.file.size}`
+      return `${LOCAL_STORAGE_KEY_PREFIX}local_${this.file.name}_${this.file.size}`
     }
     if (this.source.type === 'googlePhotos' && this.source.googlePhotosMediaId) {
-      return `${SESSION_STORAGE_KEY_PREFIX}gp_${this.source.googlePhotosMediaId}`
+      return `${LOCAL_STORAGE_KEY_PREFIX}gp_${this.source.googlePhotosMediaId}`
     }
-    return `${SESSION_STORAGE_KEY_PREFIX}anon_${Date.now()}`
+    return `${LOCAL_STORAGE_KEY_PREFIX}anon_${Date.now()}`
   }
 
   private saveSession(uploadUrl: string, bytesUploaded: number, mediaId?: string, googlePhotosFetchedAt?: number): void {
@@ -93,17 +94,21 @@ export class ChunkedUploader {
         createdAt: Date.now(),
         googlePhotosFetchedAt: googlePhotosFetchedAt,
       }
-      sessionStorage.setItem(this.getSessionKey(), JSON.stringify(session))
+      localStorage.setItem(this.getSessionKey(), JSON.stringify(session))
     } catch {
-      // sessionStorage unavailable or full — skip gracefully
+      // localStorage unavailable or full — skip gracefully
     }
   }
 
   private loadSession(): ResumableSession | null {
     try {
-      const raw = sessionStorage.getItem(this.getSessionKey())
+      const raw = localStorage.getItem(this.getSessionKey())
       if (!raw) return null
       const session: ResumableSession = JSON.parse(raw)
+      if (Date.now() - session.createdAt > SESSION_EXPIRY_MS) {
+        this.clearSession()
+        return null
+      }
       return session
     } catch {
       return null
@@ -112,16 +117,41 @@ export class ChunkedUploader {
 
   private clearSession(): void {
     try {
-      sessionStorage.removeItem(this.getSessionKey())
+      localStorage.removeItem(this.getSessionKey())
     } catch {
       // ignore
+    }
+  }
+
+  private async queryYouTubeForProgress(uploadUrl: string, totalSize: number): Promise<number | null> {
+    try {
+      const res = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Range': `bytes */${totalSize}` }
+      })
+      if (res.status === 308) {
+        const range = res.headers.get('Range')
+        if (range) {
+          const match = range.match(/bytes=(\d+)-(\d+)/)
+          if (match) {
+            return parseInt(match[2], 10) + 1
+          }
+        }
+      }
+      if (res.status === 404 || res.status === 410) {
+        this.clearSession()
+        return null
+      }
+      return null
+    } catch {
+      return null
     }
   }
 
   private isGooglePhotosExpired(): boolean {
     if (this.source.type !== 'googlePhotos') return false
     try {
-      const stored = sessionStorage.getItem(this.getSessionKey())
+      const stored = localStorage.getItem(this.getSessionKey())
       if (!stored) return true
       const session: ResumableSession = JSON.parse(stored)
       if (session.googlePhotosFetchedAt) {
@@ -177,6 +207,17 @@ export class ChunkedUploader {
         signal.addEventListener('abort', abortHandler)
       }
 
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && this.onProgress) {
+          const currentUploadedBytes = rangeStart + event.loaded
+          this.onProgress({
+            bytesUploaded: currentUploadedBytes,
+            totalBytes: totalSize,
+            percent: Math.round((currentUploadedBytes / totalSize) * 100),
+          })
+        }
+      }
+
       xhr.onload = () => {
         const status = xhr.status
         if ((status >= 200 && status < 300) || status === 308) {
@@ -223,9 +264,16 @@ export class ChunkedUploader {
         return await this.uploadChunk(uploadUrl, chunk, rangeStart, rangeEnd, totalSize, signal)
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') throw error
+        
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        const isNonRetriable = errorMsg.includes('404') || errorMsg.includes('410') || errorMsg.includes('Gone')
+        
+        if (isNonRetriable) {
+          throw error
+        }
 
         lastError = error instanceof Error ? error : new Error(String(error))
-        const delay = Math.pow(2, attempt) * 1000
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
@@ -246,7 +294,28 @@ export class ChunkedUploader {
       uploadUrl = savedSession.uploadUrl
       bytesUploaded = savedSession.bytesUploaded
 
-      // For Google Photos, re-fetch URL if expired
+      const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
+      if (verifiedBytes !== null) {
+        bytesUploaded = verifiedBytes
+        console.log(`Resuming upload from byte ${bytesUploaded}`)
+      } else {
+        console.log('Session expired or invalid, starting fresh')
+        this.clearSession()
+        const { uploadUrl: uri } = await initiateResumableUpload({
+          title: this.metadata.title,
+          description: this.metadata.description,
+          tags: this.metadata.tags,
+          categoryId: this.metadata.categoryId,
+          privacyStatus: this.metadata.privacyStatus,
+          madeForKids: this.metadata.madeForKids,
+          isShort: this.metadata.isShort,
+          fileType: 'video/*',
+          fileSize: totalSize,
+        })
+        uploadUrl = uri
+        bytesUploaded = 0
+      }
+
       if (this.source.type === 'googlePhotos' && this.isGooglePhotosExpired()) {
         const { refreshGooglePhotosUrl } = await import('@/app/actions/photos')
         try {
@@ -337,6 +406,16 @@ export class ChunkedUploader {
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') throw error
+        
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        const isExpiredSession = errorMessage.includes('404') || errorMessage.includes('410') || errorMessage.includes('Not Found') || errorMessage.includes('Gone')
+        
+        if (isExpiredSession) {
+          console.log('Session expired during upload, clearing and restarting')
+          this.clearSession()
+          throw new Error('Upload session expired. Please restart the upload.')
+        }
+        
         throw error
       }
     }
