@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { X, AlertTriangle, Loader2, ExternalLink } from 'lucide-react'
+import { X, AlertTriangle, Loader2, ExternalLink, Monitor } from 'lucide-react'
 import type { GooglePhotosImportItem } from '@/app/types/googlePhotos'
 
 interface GooglePhotosPickerProps {
@@ -26,6 +26,12 @@ interface RawPickedItem {
   mediaFile: PickedMediaFile
 }
 
+function isMobileBrowser(): boolean {
+  if (typeof window === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /iPhone|iPad|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua))
+}
+
 export default function GooglePhotosPicker({ isOpen, onClose, onImport }: GooglePhotosPickerProps) {
   const [status, setStatus] = useState<PickerStatus>('creating')
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +40,8 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
   const pickerWindowRef = useRef<Window | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortedRef = useRef(false)
+  const isMobileRef = useRef(false)
+
   const cleanup = useCallback(() => {
     abortedRef.current = true
     if (pollTimerRef.current) {
@@ -59,11 +67,24 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
     setError(null)
     setNeedsReauth(false)
 
+    // Google Photos Picker API is not supported on mobile browsers
+    if (isMobileBrowser()) {
+      isMobileRef.current = true
+      setError('Google Photos Picker requires a desktop browser. Please switch to a desktop or laptop computer to import videos from Google Photos.')
+      return
+    }
+    isMobileRef.current = false
+
     let cancelled = false
 
     const run = async () => {
       try {
-        // 1. Create picker session
+        // 1. Open blank tab FIRST while still in user-gesture context,
+        //    so the browser doesn't block the popup. We navigate it to
+        //    the picker URL once the session is created.
+        pickerWindowRef.current = window.open('about:blank', '_blank')
+
+        // 2. Create picker session
         const createRes = await fetch('/api/photos/create-session', { method: 'POST' })
 
         if (createRes.status === 403) {
@@ -72,10 +93,20 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
             setNeedsReauth(true)
             setError('Google Photos permission required. Please sign out and sign in again to grant access.')
           }
+          if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
+            pickerWindowRef.current.close()
+            pickerWindowRef.current = null
+          }
           return
         }
         if (!createRes.ok) {
-          throw new Error('Failed to create picker session')
+          const data = await createRes.json().catch(() => ({}))
+          const serverError = data?.error || data?.details || `HTTP ${createRes.status}`
+          if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
+            pickerWindowRef.current.close()
+            pickerWindowRef.current = null
+          }
+          throw new Error(serverError)
         }
 
         const { sessionId, pickerUri } = await createRes.json()
@@ -84,11 +115,15 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
 
         if (cancelled) return
 
-        // 2. Open Google Photos picker in a new tab (not a popup) so Google cookies are shared
+        // 3. Navigate the already-open tab to the picker URL
         const pickerUrl = pickerUri.endsWith('/') ? `${pickerUri}autoclose` : `${pickerUri}/autoclose`
-        pickerWindowRef.current = window.open(pickerUrl, '_blank')
+        if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
+          pickerWindowRef.current.location.href = pickerUrl
+        } else {
+          pickerWindowRef.current = window.open(pickerUrl, '_blank')
+        }
 
-        // 3. Poll until the user finishes picking
+        // 4. Poll until the user finishes picking
         let attempts = 0
         const maxAttempts = 150 // 5 minutes max
         let windowClosedAttempts = 0
@@ -135,7 +170,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
               return
             }
 
-            // 4. Session complete — map items and import
+            // Session complete — map items and import
             setStatus('retrieving')
 
             const videoItems: GooglePhotosImportItem[] = (data.mediaItems || [])
@@ -219,19 +254,35 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
           {/* Error (non-auth) */}
           {error && !needsReauth && (
             <div className="flex flex-col items-center py-6">
-              <AlertTriangle className="text-red-500 mb-4" size={32} />
-              <p className="text-yt-text-primary text-center mb-2 font-medium">Something went wrong</p>
-              <p className="text-yt-text-secondary text-sm text-center mb-6">{error}</p>
-              <button
-                onClick={() => {
-                  setError(null)
-                  setStatus('creating')
-                  handleClose()
-                }}
-                className="px-4 py-2 bg-yt-blue text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
-              >
-                Try Again
-              </button>
+              {isMobileRef.current ? (
+                <>
+                  <Monitor className="text-yt-text-secondary mb-4" size={32} />
+                  <p className="text-yt-text-primary text-center mb-2 font-medium">Desktop Required</p>
+                  <p className="text-yt-text-secondary text-sm text-center mb-6">{error}</p>
+                  <button
+                    onClick={handleClose}
+                    className="px-4 py-2 bg-yt-blue text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                  >
+                    OK
+                  </button>
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="text-red-500 mb-4" size={32} />
+                  <p className="text-yt-text-primary text-center mb-2 font-medium">Something went wrong</p>
+                  <p className="text-yt-text-secondary text-sm text-center mb-6">{error}</p>
+                  <button
+                    onClick={() => {
+                      setError(null)
+                      setStatus('creating')
+                      handleClose()
+                    }}
+                    className="px-4 py-2 bg-yt-blue text-white rounded-lg text-sm hover:bg-blue-600 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </>
+              )}
             </div>
           )}
 

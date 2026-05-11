@@ -17,12 +17,26 @@ export async function POST() {
     const { sessionId, pickerUri } = await photosService.createSession()
     return NextResponse.json({ sessionId, pickerUri })
   } catch (error: unknown) {
-    if (error instanceof GooglePhotosApiError && error.code === 403) {
+    if (error instanceof GooglePhotosApiError) {
+      console.error('Google Photos Picker session creation failed:', {
+        code: error.code,
+        message: error.message,
+      })
+
+      if (error.code === 403) {
+        return NextResponse.json(
+          { error: 'Photos permission required', needsReauth: true },
+          { status: 403 }
+        )
+      }
+
       return NextResponse.json(
-        { error: 'Photos permission required', needsReauth: true },
-        { status: 403 }
+        { error: error.message, details: `Google Picker API returned HTTP ${error.code}` },
+        { status: 502 }
       )
     }
+
+    console.error('Unexpected error creating picker session:', error)
     throw error
   }
 }

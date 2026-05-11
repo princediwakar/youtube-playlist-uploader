@@ -93,6 +93,14 @@ async function uploadChunkWithRetry(
   throw lastError || new Error('Chunk upload failed after retries')
 }
 
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/.test(navigator.userAgent || '')
+}
+
+const IOS_UPLOAD_HINT =
+  'On iOS, large uploads may fail if Safari is backgrounded. Keep Safari in the foreground during upload, or switch to a desktop browser for large files.'
+
 export async function uploadToYouTubeResumable(
   file: File,
   metadata: ResumableUploadMetadata,
@@ -124,6 +132,9 @@ export async function uploadToYouTubeResumable(
       } catch (e) {
         if (e instanceof Error && e.message.startsWith('quotaExceeded')) throw e
       }
+      if (isIOS()) {
+        errorMessage += `. ${IOS_UPLOAD_HINT}`
+      }
       throw new Error(errorMessage)
     }
 
@@ -133,7 +144,11 @@ export async function uploadToYouTubeResumable(
       throw new Error('No upload URL returned from server')
     }
   } catch (error) {
-    throw new Error(`Failed to initiate upload: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    let message = `Failed to initiate upload: ${error instanceof Error ? error.message : 'Unknown error'}`
+    if (isIOS() && error instanceof Error && !error.message.includes('On iOS')) {
+      message += `. ${IOS_UPLOAD_HINT}`
+    }
+    throw new Error(message)
   }
 
   // Step 2: Upload file in chunks
@@ -142,7 +157,15 @@ export async function uploadToYouTubeResumable(
 
   while (bytesUploaded < totalSize) {
     const chunkEnd = Math.min(bytesUploaded + CHUNK_SIZE, totalSize)
-    const chunk = file.slice(bytesUploaded, chunkEnd)
+    let chunk: Blob
+    try {
+      chunk = file.slice(bytesUploaded, chunkEnd)
+    } catch (sliceError) {
+      const hint = isIOS()
+        ? 'The browser was unable to read this file. This can happen on iOS with photo library videos. Try copying the file to a different location first.'
+        : 'The browser was unable to read this file.'
+      throw new Error(`${hint} (${sliceError instanceof Error ? sliceError.message : 'Unknown error'})`)
+    }
 
     let response: Response
     try {
@@ -155,7 +178,11 @@ export async function uploadToYouTubeResumable(
         signal
       )
     } catch (error) {
-      throw new Error(`Chunk upload failed at byte ${bytesUploaded}/${totalSize}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      let message = `Chunk upload failed at byte ${bytesUploaded}/${totalSize}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      if (isIOS() && error instanceof Error && !error.message.includes('On iOS')) {
+        message += `. ${IOS_UPLOAD_HINT}`
+      }
+      throw new Error(message)
     }
 
     // 200 or 201 = upload complete

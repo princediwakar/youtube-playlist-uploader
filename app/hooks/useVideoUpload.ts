@@ -281,6 +281,10 @@ export function useVideoUpload() {
           const text = await response.text().catch(() => '')
           if (text) errorMessage = text
         }
+        const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '')
+        if (isIOS && response.status === 413) {
+          errorMessage += '. The file may be too large for mobile upload. Try a smaller file or use a desktop browser.'
+        }
         throw new Error(errorMessage)
       }
 

@@ -54,6 +54,24 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
     clearQuotaWarning()
 
     try {
+      // Pre-flight: refresh the access token so it doesn't expire mid-upload
+      try {
+        const refreshRes = await fetch('/api/auth/refresh')
+        if (!refreshRes.ok) {
+          const refreshErr = await refreshRes.json().catch(() => ({}))
+          setAuthError(refreshErr.error || 'Your session has expired. Please sign out and sign in again.')
+          return
+        }
+        const refreshData = await refreshRes.json()
+        if (refreshData.refreshed) {
+          console.log('Access token refreshed before upload')
+        }
+      } catch (refreshError) {
+        console.error('Pre-upload token refresh failed:', refreshError)
+        setAuthError('Unable to verify your session. Please check your connection and try again.')
+        return
+      }
+
       let batchNumber = 0
       let pendingQueue = videos.filter(v => v.status === 'pending')
       let playlistId: string | null = null
