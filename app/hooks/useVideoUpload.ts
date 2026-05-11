@@ -187,6 +187,7 @@ export function useVideoUpload() {
                 madeForKids: uploadSettings.madeForKids,
                 isShort: videoProps.isShort,
               },
+              null,
               onProgress ? (p) => onProgress(p.percent) : undefined,
               abortControllerRef.current?.signal
             )
