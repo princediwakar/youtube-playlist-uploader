@@ -41,7 +41,7 @@ class AlreadyCompleteError extends Error {
   }
 }
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB (5242880 = 256KB * 20480)
+const CHUNK_SIZE = 4 * 1024 * 1024 // 4 MB
 const LOCAL_STORAGE_KEY_PREFIX = 'yt_upload_session_'
 const GOOGLE_PHOTOS_URL_EXPIRY_MS = 60 * 60 * 1000 // 60 minutes
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000 // 24 hours
