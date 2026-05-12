@@ -2,11 +2,12 @@
   "functions": {
     "app/api/youtube/upload/route.ts": {
       "maxDuration": 300
-    }
-  },
-  "experimental": {
-    "serverActions": {
-      "bodySizeLimit": "10mb"
+    },
+    "app/api/youtube/upload-chunk/route.ts": {
+      "maxDuration": 120
+    },
+    "app/api/youtube/query-progress/route.ts": {
+      "maxDuration": 30
     }
   }
 }
