@@ -1,3 +1,4 @@
+// app/components/UploadScreen.tsx
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -36,6 +37,9 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0
   })
 
+  // Track which import method triggered the drop, so onDrop can auto-set uploadMode
+  const importModeRef = useRef<'individual' | 'playlist' | null>(null)
+
   // Auto-detect Shorts after media analysis completes
   const shortsDetectedRef = useRef(false)
 
@@ -62,6 +66,10 @@ export default function UploadScreen({ session }: UploadScreenProps) {
 
     if (newVideos.length === 0) return
 
+    const mode = importModeRef.current || 'individual'
+    setUploadSettings(prev => ({ ...prev, uploadMode: mode }))
+    importModeRef.current = null
+
     setCurrentPlaylistId(null)
     setIsUploadCardsExpanded(false)
 
@@ -81,6 +89,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   })
 
   const handleFolderSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    importModeRef.current = 'playlist'
     const files = Array.from(event.target.files || [])
     onDrop(files)
   }

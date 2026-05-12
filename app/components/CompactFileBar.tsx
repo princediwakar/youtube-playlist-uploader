@@ -5,10 +5,9 @@ import { useFileContext } from '@/app/contexts/FileContext'
 
 interface CompactFileBarProps {
   onExpandCards: () => void
-  onAddMore: () => void
 }
 
-export function CompactFileBar({ onExpandCards, onAddMore }: CompactFileBarProps) {
+export function CompactFileBar({ onExpandCards }: CompactFileBarProps) {
   const { videos, removeVideo } = useFileContext()
 
   const folderCount = Array.from(new Set(videos.map(v => v.folder))).length
@@ -38,14 +37,6 @@ export function CompactFileBar({ onExpandCards, onAddMore }: CompactFileBarProps
           <Edit3 size={14} />
           <span className="hidden sm:inline">Change files</span>
           <span className="sm:hidden">Change</span>
-        </button>
-        <button
-          onClick={onAddMore}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm text-yt-blue hover:text-blue-400 rounded-lg hover:bg-yt-blue/10 transition-colors"
-        >
-          <Plus size={14} />
-          <span className="hidden sm:inline">Add more</span>
-          <span className="sm:hidden">Add</span>
         </button>
         <button
           onClick={() => {

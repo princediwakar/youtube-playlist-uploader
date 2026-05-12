@@ -1,3 +1,4 @@
+// app/components/UploadSettingsPanel.tsx
 'use client'
 
 import { ChevronDown, Check, Database, Info } from 'lucide-react'
