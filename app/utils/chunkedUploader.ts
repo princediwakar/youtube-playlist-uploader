@@ -248,38 +248,7 @@ export class ChunkedUploader {
     })
   }
 
-  private async uploadChunkWithRetry(
-    uploadUrl: string,
-    chunk: Blob,
-    rangeStart: number,
-    rangeEnd: number,
-    totalSize: number,
-    signal: AbortSignal
-  ): Promise<{ status: number; body: unknown }> {
-    const MAX_RETRIES = 3
-    let lastError: Error | null = null
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        return await this.uploadChunk(uploadUrl, chunk, rangeStart, rangeEnd, totalSize, signal)
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') throw error
-        
-        const errorMsg = error instanceof Error ? error.message : String(error)
-        const isNonRetriable = errorMsg.includes('404') || errorMsg.includes('410') || errorMsg.includes('Gone')
-        
-        if (isNonRetriable) {
-          throw error
-        }
-
-        lastError = error instanceof Error ? error : new Error(String(error))
-        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-    }
-
-    throw lastError || new Error('Chunk upload failed after retries')
-  }
 
   async upload(): Promise<string> {
     const totalSize = this.source.size
@@ -344,9 +313,12 @@ export class ChunkedUploader {
       })
       uploadUrl = uri
       bytesUploaded = 0
+      this.saveSession(uploadUrl, bytesUploaded)
     }
 
     const signal = this.signal || new AbortController().signal
+
+    let retryCount = 0
 
     // Upload chunks
     while (bytesUploaded < totalSize) {
@@ -370,7 +342,7 @@ export class ChunkedUploader {
       }
 
       try {
-        const { status, body } = await this.uploadChunkWithRetry(
+        const { status, body } = await this.uploadChunk(
           uploadUrl,
           chunk,
           bytesUploaded,
@@ -391,18 +363,21 @@ export class ChunkedUploader {
           return videoId
         }
 
-        bytesUploaded = chunkEnd
-        const fetchedAt = this.source.type === 'googlePhotos' && this.source.googlePhotosFetchedAt
-          ? this.source.googlePhotosFetchedAt
-          : undefined
-        this.saveSession(uploadUrl, bytesUploaded, undefined, fetchedAt)
+        if (status === 308) {
+          bytesUploaded = chunkEnd
+          retryCount = 0 // Reset retries on success
+          const fetchedAt = this.source.type === 'googlePhotos' && this.source.googlePhotosFetchedAt
+            ? this.source.googlePhotosFetchedAt
+            : undefined
+          this.saveSession(uploadUrl, bytesUploaded, undefined, fetchedAt)
 
-        if (this.onProgress) {
-          this.onProgress({
-            bytesUploaded,
-            totalBytes: totalSize,
-            percent: Math.round((bytesUploaded / totalSize) * 100),
-          })
+          if (this.onProgress) {
+            this.onProgress({
+              bytesUploaded,
+              totalBytes: totalSize,
+              percent: Math.round((bytesUploaded / totalSize) * 100),
+            })
+          }
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') throw error
@@ -415,8 +390,19 @@ export class ChunkedUploader {
           this.clearSession()
           throw new Error('Upload session expired. Please restart the upload.')
         }
+
+        // Exponential Backoff: (2^retry * 1000) + random jitter
+        const wait = Math.pow(2, retryCount) * 1000 + Math.random() * 1000
+        if (retryCount > 5) throw new Error('Upload failed after maximum retries')
         
-        throw error
+        await new Promise(r => setTimeout(r, wait))
+        retryCount++
+        
+        // Re-verify byte position with Google after error
+        const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
+        if (verifiedBytes !== null) {
+          bytesUploaded = verifiedBytes
+        }
       }
     }
 
