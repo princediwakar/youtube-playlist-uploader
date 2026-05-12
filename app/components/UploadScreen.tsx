@@ -80,7 +80,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     }
   }, [uploadSettings.playlistName, replaceVideos, setCurrentPlaylistId, setUploadSettings])
 
-  const { getRootProps, getInputProps, isDragActive, open: openFileDialog } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'video/*': ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.flv', '.wmv', '.m4v', '.3gp', '.3gpp', '.ts'],
@@ -427,7 +427,6 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         <div className="mb-6">
           <CompactFileBar
             onExpandCards={() => setIsUploadCardsExpanded(true)}
-            onAddMore={() => openFileDialog()}
           />
         </div>
       )}
