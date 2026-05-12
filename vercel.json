@@ -1,8 +1,12 @@
 {
   "functions": {
     "app/api/youtube/upload/route.ts": {
-      "maxDuration": 300,
-      "memory": 2048
+      "maxDuration": 300
+    }
+  },
+  "experimental": {
+    "serverActions": {
+      "bodySizeLimit": "10mb"
     }
   }
 }

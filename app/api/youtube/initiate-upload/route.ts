@@ -1,3 +1,4 @@
+// app/api/youtube/initiate-upload/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '../../../../lib/auth'
 import { rateLimit } from '../../../utils/rateLimit'
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json; charset=UTF-8',
           'X-Upload-Content-Type': fileType || 'video/*',
           'X-Upload-Content-Length': String(fileSize || 0),
+          'X-Origin': request.headers.get('origin') || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://youtube-playlist-uploader.vercel.app'),
         },
         body: JSON.stringify(requestBody),
       }

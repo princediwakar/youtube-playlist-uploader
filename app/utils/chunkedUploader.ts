@@ -34,6 +34,13 @@ interface ResumableSession {
   googlePhotosFetchedAt?: number
 }
 
+class AlreadyCompleteError extends Error {
+  constructor(public readonly videoId: string) {
+    super('Upload already complete')
+    this.name = 'AlreadyCompleteError'
+  }
+}
+
 const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB (5242880 = 256KB * 20480)
 const LOCAL_STORAGE_KEY_PREFIX = 'yt_upload_session_'
 const GOOGLE_PHOTOS_URL_EXPIRY_MS = 60 * 60 * 1000 // 60 minutes
@@ -123,30 +130,81 @@ export class ChunkedUploader {
     }
   }
 
-  private async queryYouTubeForProgress(uploadUrl: string, totalSize: number): Promise<number | null> {
-    try {
-      const res = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: { 'Content-Range': `bytes */${totalSize}` }
-      })
-      if (res.status === 308) {
-        const range = res.headers.get('Range')
-        if (range) {
-          const match = range.match(/bytes=(\d+)-(\d+)/)
-          if (match) {
-            return parseInt(match[2], 10) + 1
-          }
-        }
-      }
-      if (res.status === 404 || res.status === 410) {
-        this.clearSession()
-        return null
-      }
-      return null
-    } catch {
-      return null
+private async queryYouTubeForProgress(uploadUrl: string, totalSize: number): Promise<number | null> {
+  const response = await fetch('/api/youtube/query-progress', {
+    method: 'PUT',
+    headers: {
+      'x-upload-url': uploadUrl,
+      'x-total-size': String(totalSize),
+    },
+  })
+
+  if (response.status === 308) {
+    const range = response.headers.get('Range')
+    if (range) {
+      const match = range.match(/bytes=(\d+)-(\d+)/)
+      if (match) return parseInt(match[2], 10) + 1
     }
+    return 0 // 308 with no Range = nothing uploaded yet
   }
+
+  if (response.status === 200 || response.status === 201) {
+    // Already complete — extract video ID from YouTube's response body
+    try {
+      const data = await response.json()
+      const videoId = data?.id
+      if (videoId) throw new AlreadyCompleteError(videoId)
+    } catch (e) {
+      if (e instanceof AlreadyCompleteError) throw e
+    }
+    // Couldn't parse video ID — clear session so caller restarts fresh
+    this.clearSession()
+    return null
+  }
+
+  if ([400, 401, 403, 404, 410].includes(response.status)) {
+    this.clearSession()
+    return null // session gone — caller starts fresh
+  }
+
+  // 5xx or unexpected — throw so exponential backoff handles it
+  // NEVER return null here — that would create a duplicate video
+  throw new Error(`queryProgress failed with HTTP ${response.status}`)
+}
+
+private async uploadChunk(
+  uploadUrl: string,
+  chunk: Blob,
+  rangeStart: number,
+  rangeEnd: number,
+  totalSize: number,
+  signal: AbortSignal
+): Promise<{ status: number; body: unknown }> {
+  const response = await fetch('/api/youtube/upload-chunk', {
+    method: 'PUT',
+    headers: {
+      'x-upload-url': uploadUrl,
+      'content-range': `bytes ${rangeStart}-${rangeEnd}/${totalSize}`,
+      'content-type': 'video/*',
+    },
+    body: chunk,
+    signal,
+  })
+
+  if (response.status === 200 || response.status === 201 || response.status === 308) {
+    let body: unknown = null
+    if (response.status !== 308) {
+      const text = await response.text()
+      if (text) {
+        try { body = JSON.parse(text) } catch { /* ignore */ }
+      }
+    }
+    return { status: response.status, body }
+  }
+
+  const errorText = await response.text()
+  throw new Error(`Chunk upload failed: HTTP ${response.status} - ${errorText}`)
+}
 
   private isGooglePhotosExpired(): boolean {
     if (this.source.type !== 'googlePhotos') return false
@@ -188,67 +246,6 @@ export class ChunkedUploader {
     return response.arrayBuffer()
   }
 
-  private uploadChunk(
-    uploadUrl: string,
-    chunk: Blob,
-    rangeStart: number,
-    rangeEnd: number,
-    totalSize: number,
-    signal: AbortSignal
-  ): Promise<{ status: number; body: unknown }> {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('PUT', uploadUrl, true)
-      xhr.setRequestHeader('Content-Range', `bytes ${rangeStart}-${rangeEnd}/${totalSize}`)
-      
-      const abortHandler = () => xhr.abort()
-      if (signal) {
-        if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'))
-        signal.addEventListener('abort', abortHandler)
-      }
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && this.onProgress) {
-          const currentUploadedBytes = rangeStart + event.loaded
-          this.onProgress({
-            bytesUploaded: currentUploadedBytes,
-            totalBytes: totalSize,
-            percent: Math.round((currentUploadedBytes / totalSize) * 100),
-          })
-        }
-      }
-
-      xhr.onload = () => {
-        const status = xhr.status
-        if ((status >= 200 && status < 300) || status === 308) {
-          let body: unknown = null
-          if (xhr.responseText) {
-            try {
-              body = JSON.parse(xhr.responseText)
-            } catch {
-              // chunk response might have no body on 308
-            }
-          }
-          resolve({ status, body })
-        } else {
-          reject(new Error(`Chunk upload failed: HTTP ${status} - ${xhr.responseText}`))
-        }
-      }
-
-      xhr.onerror = () => reject(new Error('Network error during chunk upload'))
-      xhr.onabort = () => reject(new DOMException('Aborted', 'AbortError'))
-
-      xhr.onloadend = () => {
-        if (signal) {
-          signal.removeEventListener('abort', abortHandler)
-        }
-      }
-
-      xhr.send(chunk)
-    })
-  }
-
-
 
   async upload(): Promise<string> {
     const totalSize = this.source.size
@@ -263,26 +260,37 @@ export class ChunkedUploader {
       uploadUrl = savedSession.uploadUrl
       bytesUploaded = savedSession.bytesUploaded
 
-      const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
-      if (verifiedBytes !== null) {
-        bytesUploaded = verifiedBytes
-        console.log(`Resuming upload from byte ${bytesUploaded}`)
-      } else {
-        console.log('Session expired or invalid, starting fresh')
-        this.clearSession()
-        const { uploadUrl: uri } = await initiateResumableUpload({
-          title: this.metadata.title,
-          description: this.metadata.description,
-          tags: this.metadata.tags,
-          categoryId: this.metadata.categoryId,
-          privacyStatus: this.metadata.privacyStatus,
-          madeForKids: this.metadata.madeForKids,
-          isShort: this.metadata.isShort,
-          fileType: 'video/*',
-          fileSize: totalSize,
-        })
-        uploadUrl = uri
-        bytesUploaded = 0
+      try {
+        const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
+        if (verifiedBytes !== null) {
+          bytesUploaded = verifiedBytes
+          console.log(`Resuming upload from byte ${bytesUploaded}`)
+        } else {
+          console.log('Session expired or invalid, starting fresh')
+          this.clearSession()
+          const { uploadUrl: uri } = await initiateResumableUpload({
+            title: this.metadata.title,
+            description: this.metadata.description,
+            tags: this.metadata.tags,
+            categoryId: this.metadata.categoryId,
+            privacyStatus: this.metadata.privacyStatus,
+            madeForKids: this.metadata.madeForKids,
+            isShort: this.metadata.isShort,
+            fileType: 'video/*',
+            fileSize: totalSize,
+          })
+          uploadUrl = uri
+          bytesUploaded = 0
+        }
+      } catch (e) {
+        if (e instanceof AlreadyCompleteError) {
+          this.clearSession()
+          if (this.onProgress) {
+            this.onProgress({ bytesUploaded: totalSize, totalBytes: totalSize, percent: 100 })
+          }
+          return e.videoId
+        }
+        throw e
       }
 
       if (this.source.type === 'googlePhotos' && this.isGooglePhotosExpired()) {
@@ -381,7 +389,14 @@ export class ChunkedUploader {
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') throw error
-        
+        if (error instanceof AlreadyCompleteError) {
+          this.clearSession()
+          if (this.onProgress) {
+            this.onProgress({ bytesUploaded: totalSize, totalBytes: totalSize, percent: 100 })
+          }
+          return error.videoId
+        }
+
         const errorMessage = error instanceof Error ? error.message : String(error)
         const isExpiredSession = errorMessage.includes('404') || errorMessage.includes('410') || errorMessage.includes('Not Found') || errorMessage.includes('Gone')
         
@@ -399,9 +414,14 @@ export class ChunkedUploader {
         retryCount++
         
         // Re-verify byte position with Google after error
-        const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
-        if (verifiedBytes !== null) {
-          bytesUploaded = verifiedBytes
+        try {
+          const verifiedBytes = await this.queryYouTubeForProgress(uploadUrl, totalSize)
+          if (verifiedBytes !== null) {
+            bytesUploaded = verifiedBytes
+          }
+        } catch (queryErr) {
+          if (queryErr instanceof AlreadyCompleteError) throw queryErr
+          console.warn('Failed to verify progress, continuing with current byte position:', queryErr)
         }
       }
     }

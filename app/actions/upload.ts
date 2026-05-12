@@ -2,6 +2,7 @@
 'use server'
 
 import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
 
 interface InitiateUploadParams {
   title: string
@@ -54,7 +55,10 @@ export async function initiateResumableUpload(
   }
 
 
-const initResponse = await fetch(
+    const headersList = await headers()
+    const origin = headersList.get('origin') || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://youtube-playlist-uploader.vercel.app')
+    
+    const initResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
     {
       method: 'POST',
@@ -63,9 +67,7 @@ const initResponse = await fetch(
         'Content-Type': 'application/json; charset=UTF-8',
         'X-Upload-Content-Type': metadata.fileType || 'video/*',
         'X-Upload-Content-Length': String(metadata.fileSize || 0),
-        // REMOVE Manual Origin headers here. 
-        // If the client initiates the session, the browser handles this.
-        // If the server initiates, Google expects the client to be authorized via the Cloud Console.
+        'X-Origin': origin,
       },
       body: JSON.stringify(requestBody),
     }

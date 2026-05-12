@@ -1,71 +1,79 @@
-# CLAUDE.md — 12-rule template
+# CLAUDE.md
 
-These rules apply to every task in this project unless explicitly overridden.
-Bias: caution over speed on non-trivial work. Use judgment on trivial tasks.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Rule 1 — Think Before Coding
-State assumptions explicitly. If uncertain, ask rather than guess.
-Present multiple interpretations when ambiguity exists.
-Push back when a simpler approach exists.
-Stop when confused. Name what's unclear.
+## Commands
 
-## Rule 2 — Simplicity First
-Minimum code that solves the problem. Nothing speculative.
-No features beyond what was asked. No abstractions for single-use code.
-Test: would a senior engineer say this is overcomplicated? If yes, simplify.
+```bash
+npm run dev          # Start Next.js dev server (localhost:3000)
+npm run build        # Production build
+npm run start        # Start production server
+npm run lint         # ESLint
+```
 
-## Rule 3 — Surgical Changes
-Touch only what you must. Clean up only your own mess.
-Don't "improve" adjacent code, comments, or formatting.
-Don't refactor what isn't broken. Match existing style.
+No test suite exists yet. After changes, at minimum run `npm run build` and `npm run lint`.
 
-## Rule 4 — Goal-Driven Execution
-Define success criteria. Loop until verified.
-Don't follow steps. Define success and iterate.
-Strong success criteria let you loop independently.
+## Architecture
 
-## Rule 5 — Use the model only for judgment calls
-Use me for: classification, drafting, summarization, extraction.
-Do NOT use me for: routing, retries, deterministic transforms.
-If code can answer, code answers.
+**Stack:** Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 3. Hosted on Vercel with `@vercel/postgres`.
 
-## Rule 6 — Token budgets are not advisory
-Per-task: 4,000 tokens. Per-session: 30,000 tokens.
-If approaching budget, summarize and start fresh.
-Surface the breach. Do not silently overrun.
+### State: Zustand + IndexedDB (thin context, fat store)
 
-## Rule 7 — Surface conflicts, don't average them
-If two patterns contradict, pick one (more recent / more tested).
-Explain why. Flag the other for cleanup.
-Don't blend conflicting patterns.
+All global state lives in a single Zustand store (`app/store/index.ts`) persisted to IndexedDB via `idb-keyval`. The four React Contexts (`FileContext`, `PlaylistContext`, `UploadContext`, `SettingsContext`) are thin facades — they read from the Zustand store and expose domain-specific actions. Components should use contexts, not the raw store. The store persists `settings`, `uploadQueue` (with `file` references stripped), and upload state across tab closures.
 
-## Rule 8 — Read before you write
-Before adding code, read exports, immediate callers, shared utilities.
-"Looks orthogonal" is dangerous. If unsure why code is structured a way, ask.
+### Upload pipeline: zero-egress, browser-to-YouTube
 
-## Rule 9 — Tests verify intent, not just behavior
-Tests must encode WHY behavior matters, not just WHAT it does.
-A test that can't fail when business logic changes is wrong.
+`ChunkedUploader` (`app/utils/chunkedUploader.ts`) is the core class. It never sends bytes through Vercel. Flow:
 
-## Rule 10 — Checkpoint after every significant step
-Summarize what was done, what's verified, what's left.
-Don't continue from a state you can't describe back.
-If you lose track, stop and restate.
+1. **Initiate:** `initiateResumableUpload()` Server Action (`app/actions/upload.ts`) calls `await auth()` and hits YouTube's resumable upload endpoint, returning only a resumable URI.
+2. **Upload:** `ChunkedUploader.upload()` runs entirely in the browser — slices `File` objects (local) or `fetch()` with `Range` headers (Google Photos) into 5 MB chunks, PUTs directly to YouTube's URI.
+3. **Resume:** After each chunk, saves byte offset + URI to `localStorage`. On network drop, queries YouTube via `Content-Range: bytes */<total>` to determine actual bytes received.
 
-## Rule 11 — Match the codebase's conventions, even if you disagree
-Conformance > taste inside the codebase.
-If you genuinely think a convention is harmful, surface it. Don't fork silently.
+### Dual-read strategy
 
-## Rule 12 — Fail loud
-"Completed" is wrong if anything was skipped silently.
-"Tests pass" is wrong if any were skipped.
-Default to surfacing uncertainty, not hiding it.
+- **Local files:** `file.slice(start, end)` → 5 MB `Blob` in memory.
+- **Google Photos:** `fetch(baseUrl, { Range })` → 5 MB ArrayBuffer directly from Google's servers.
+- Never more than 5 MB in memory regardless of file size.
 
-## Rule 13 — Ruthless Architectural Constraints (YouTube Uploader)
-These are non-negotiable project boundaries based on `PLAN.md`. DO NOT deviate from them.
+### FFmpeg sandbox (audio-to-video conversion)
 
-1. **Zero-Egress Uploads:** Vercel NEVER touches media bytes. All uploads must go directly from the browser to YouTube using resumable URIs (via `ChunkedUploader`). Do not buffer files in server memory or serverless functions.
-2. **Server Actions over API Routes:** Use Next.js Server Actions for all database mutations and state changes. Only use `app/api/...` routes for webhooks or direct-to-YouTube proxying.
-3. **State Management:** The upload queue is governed by Zustand + IndexedDB. Do not create new React Contexts for global state. Do not rely on React state to survive a tab closure.
-4. **Strict FFmpeg Isolation:** Do not attempt to run `ffmpeg.wasm` in the main application thread. It requires strict COOP/COEP headers that will kill Google OAuth popups. All FFmpeg processing must occur inside a dedicated, isolated `<iframe>` communicating only via `postMessage`.
-5. **Authentication:** We use Auth.js v5. Do not use legacy NextAuth v4 patterns (e.g., `getServerSession`). Use `await auth()` everywhere on the server.
+`app/api/engine/route.ts` serves a static HTML page at `/api/engine` with strict COOP/COEP headers. `useFfmpegEngine` (`app/hooks/useFfmpegEngine.ts`) creates a singleton hidden `<iframe>` pointing to this endpoint. Audio files are sent via `postMessage` with transferable ArrayBuffers; the iframe runs `ffmpeg.wasm`, generates a waveform visualization video, and posts the resulting `Blob` back. The main thread never loads `ffmpeg.wasm` directly — this is mandatory because COOP/COEP headers kill Google OAuth popups.
+
+### Auth: Auth.js v5
+
+`lib/auth.ts` exports `{ handlers, auth, signIn, signOut }` via `NextAuth()` with the Google provider (YouTube + Photos Picker scopes). Server-side: use `await auth()` to get the session. Client-side: use `useSession()` from `next-auth/react`. The auth route at `app/api/auth/[...nextauth]/route.ts` is a one-liner re-export of `handlers`. Token refresh happens automatically in the JWT callback.
+
+### Server Actions vs API Routes
+
+- **Server Actions** (`app/actions/*.ts`): all DB mutations, playlist CRUD, upload initiation, navigation links, history recording. Use `'use server'` directive + `await auth()`.
+- **API Routes** (`app/api/*/route.ts`): only for webhooks, the FFmpeg engine HTML endpoint, auth callbacks, token refresh, Google Photos session polling, and audio conversion. These exist only when Server Actions don't fit (streaming, cross-origin iframes, OAuth callbacks).
+
+### Database: Vercel Postgres
+
+Schema in `app/db/schema.ts` — a single `upload_history` table. Accessed via `@vercel/postgres` `sql` template tag. History page at `/history` is a client component with pagination and CSV export.
+
+### Key types
+
+- `app/types/video.ts` — `MediaFile`, `UploadSettings`, `PlaylistItem`
+- `app/types/media.ts` — `BaseMediaFile`, media type detection
+- `app/types/googlePhotos.ts` — Google Photos picker types
+- `types/next-auth.d.ts` — Session type augmentation
+
+## Architectural Constraints (non-negotiable)
+
+1. **Zero-Egress Uploads:** Vercel never touches media bytes. All uploads go browser→YouTube via `ChunkedUploader`.
+2. **Server Actions over API Routes:** Use Server Actions for DB writes and state changes. API routes only for webhooks, streaming, or cross-origin iframe endpoints.
+3. **Zustand + IndexedDB:** No new React Contexts for global state. Queue must survive tab closures.
+4. **FFmpeg isolation:** `ffmpeg.wasm` only runs inside the `/api/engine` iframe via `postMessage`. Never in the main thread — COOP/COEP breaks OAuth.
+5. **Auth.js v5:** Use `await auth()` server-side, `useSession()` client-side. Never `getServerSession`.
+
+## General Rules
+
+1. **Think Before Coding:** State assumptions. Ask if uncertain. Push back when a simpler approach exists. Stop when confused.
+2. **Simplicity First:** Minimum code to solve the problem. No speculative features. No abstractions for single-use code.
+3. **Surgical Changes:** Touch only what you must. Don't "improve" adjacent code. Don't refactor what isn't broken. Match existing style.
+4. **Goal-Driven Execution:** Define success criteria. Loop until verified.
+5. **Use the model for judgment calls only:** Classification, drafting, summarization. NOT for routing, retries, or deterministic transforms.
+6. **Read before you write:** Check exports, callers, shared utilities before adding code.
+7. **Match codebase conventions:** Conformance > personal taste. If a convention is harmful, surface it — don't fork silently.
+8. **Fail loud:** Never silently skip a step. Surface uncertainty instead of hiding it.
