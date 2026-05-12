@@ -4,6 +4,11 @@ const nextConfig = {
   env: {
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '6mb',
+    },
+  },
   async headers() {
     return [
       {
