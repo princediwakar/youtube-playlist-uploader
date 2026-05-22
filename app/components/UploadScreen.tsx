@@ -8,6 +8,7 @@ import { useDropzone } from 'react-dropzone'
 import { isVideoFile } from '@/app/types/video'
 import type { GooglePhotosImportItem } from '@/app/types/googlePhotos'
 import { extractPlaylistName } from '@/app/utils/videoHelpers'
+import { createPlaylist } from '@/app/actions/playlist'
 import GooglePhotosPicker from '@/app/components/GooglePhotosPicker'
 import { CompactFileBar } from '@/app/components/CompactFileBar'
 import { UploadSettingsPanel } from '@/app/components/UploadSettingsPanel'
@@ -133,7 +134,23 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     const videosToUpload = videos.filter(v => v.status === 'pending')
     if (videosToUpload.length === 0) return
 
-    const playlistId = uploadSettings.useExistingPlaylist ? uploadSettings.selectedPlaylistId : undefined
+    let playlistId: string | undefined
+
+    if (uploadSettings.uploadMode === 'playlist') {
+      if (uploadSettings.useExistingPlaylist) {
+        playlistId = uploadSettings.selectedPlaylistId
+      } else {
+        try {
+          const result = await createPlaylist(uploadSettings.playlistName, '', uploadSettings.privacyStatus)
+          playlistId = result.playlistId
+          setCurrentPlaylistId(playlistId)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Failed to create playlist'
+          setAuthError(message)
+          return
+        }
+      }
+    }
 
     const queue: import('@/app/hooks/useVideoUpload').UploadQueueItem[] = videosToUpload.map((video, idx) => ({
       video,
@@ -172,7 +189,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
         if (idx !== -1) updateVideo(idx, { status: 'error', error: error.message })
       }
     )
-  }, [session, videos, uploadSettings, uploadVideos, setAuthError, updateVideo])
+  }, [session, videos, uploadSettings, uploadVideos, setAuthError, setCurrentPlaylistId, updateVideo])
 
   // Compute upload button disabled state
   const isUploadDisabled =
