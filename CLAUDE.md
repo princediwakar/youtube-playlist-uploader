@@ -77,3 +77,4 @@ Schema in `app/db/schema.ts` — a single `upload_history` table. Accessed via `
 6. **Read before you write:** Check exports, callers, shared utilities before adding code.
 7. **Match codebase conventions:** Conformance > personal taste. If a convention is harmful, surface it — don't fork silently.
 8. **Fail loud:** Never silently skip a step. Surface uncertainty instead of hiding it.
+
