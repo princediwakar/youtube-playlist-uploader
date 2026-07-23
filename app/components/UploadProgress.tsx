@@ -209,7 +209,7 @@ export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressPro
         )}
 
         {/* Duplicate Videos Info */}
-        {uploadSettings.useExistingPlaylist && (
+        {uploadSettings.uploadMode === 'playlist' && uploadSettings.useExistingPlaylist && (
           <div>
             {loadingExistingVideos && (
               <div className="flex items-start space-x-3 p-3 bg-yt-bg rounded-lg border border-yt-border">
@@ -224,9 +224,9 @@ export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressPro
               <div className="flex items-start space-x-3 p-3 bg-yt-bg rounded-lg border border-yt-border">
                 <CheckCircle size={16} className="text-green-500 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-yt-text-primary">Duplicate check complete</p>
+                  <p className="text-sm font-medium text-yt-text-primary">Playlist Connected</p>
                   <p className="text-xs text-yt-text-secondary">
-                    Found {existingPlaylistVideos.length} matching videos. They will be skipped.
+                    Loaded {existingPlaylistVideos.length} videos from the playlist for duplicate checking.
                   </p>
                 </div>
               </div>
@@ -246,7 +246,7 @@ export function UploadProgress({ isUploadDisabled, onUpload }: UploadProgressPro
         )}
 
         {/* Playlist Link */}
-        {currentPlaylistId && (
+        {uploadSettings.uploadMode === 'playlist' && currentPlaylistId && (
           <div className="p-3 bg-yt-bg rounded-lg border border-green-500/30">
             <p className="text-xs font-medium text-green-500 mb-2">
               {uploadSettings.useExistingPlaylist ? 'Playlist Connected' : 'Playlist Created'}

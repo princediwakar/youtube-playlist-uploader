@@ -117,7 +117,7 @@ Create a `.env.local` file:
 ```env
 # NextAuth.js Configuration
 NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-random-secret-string
+AUTH_SECRET=your-random-secret-string
 
 # Google OAuth Configuration
 GOOGLE_CLIENT_ID=your-client-id.googleusercontent.com
@@ -151,7 +151,7 @@ vercel
 In your Vercel dashboard, add the following environment variables:
 
 - `NEXTAUTH_URL`: `https://your-app.vercel.app`
-- `NEXTAUTH_SECRET`: A random secret string
+- `AUTH_SECRET`: A random secret string
 - `GOOGLE_CLIENT_ID`: Your Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET`: Your Google OAuth client secret
 - `DEEPSEEK_API_KEY`: Your DeepSeek API key (optional)

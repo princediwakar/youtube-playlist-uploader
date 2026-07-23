@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 import { MediaFile, UploadSettings, YouTubePlaylistVideo } from '@/app/types/video'
-import { generateTitle, getBasename, calculateInsertionPositions } from '@/app/utils/videoHelpers'
+import { generateTitle, getBasename, calculateInsertionPositions, normalizeTitleForComparison } from '@/app/utils/videoHelpers'
 import type { UploadQueueItem } from './useVideoUpload'
 import { createPlaylist } from '@/app/actions/playlist'
 
@@ -153,14 +153,14 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
         const existingTitles = new Set<string>()
         for (const existing of activeExistingVideos) {
           if (existing?.title && typeof existing.title === 'string') {
-            existingTitles.add(existing.title.trim().toLowerCase())
+            existingTitles.add(normalizeTitleForComparison(existing.title))
           }
         }
 
         if (uploadSettings.uploadMode === 'playlist' && existingTitles.size > 0) {
           videosToProcess = processedVideos.filter(pv => {
             const videoTitle = pv.metadata?.title || ''
-            const normalizedTitle = videoTitle.trim().toLowerCase()
+            const normalizedTitle = normalizeTitleForComparison(videoTitle)
             const isDuplicate = existingTitles.has(normalizedTitle)
             if (isDuplicate) {
               console.log(`Skipping duplicate video: ${videoTitle}`)

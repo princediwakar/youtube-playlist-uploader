@@ -213,7 +213,7 @@ const uploadVideo = useCallback(async (
         setCurrentUpload(null)
 
         if (uploadSettings.uploadMode === 'playlist' && playlistId) {
-          completeUpload(videoId, playlistId, position).catch(err => console.error('Complete error:', err))
+          // completeUpload is now handled sequentially in uploadVideos
         }
 
         recordUpload({
@@ -279,7 +279,7 @@ const uploadVideo = useCallback(async (
         setCurrentUpload(null)
 
         if (uploadSettings.uploadMode === 'playlist' && playlistId) {
-          completeUpload(videoId, playlistId, position).catch(err => console.error('Complete error:', err))
+          // completeUpload is now handled sequentially in uploadVideos
         }
 
         recordUpload({
@@ -500,10 +500,8 @@ const uploadVideos = useCallback(async (
           if (onProgress) {
             onProgress(completedCount, queue.length)
           }
-          if (onVideoComplete) {
-            onVideoComplete(video, result)
-          }
-          return result
+          // Return item and result so we can process sequentially later
+          return { item, result }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Upload failed'
 
@@ -516,11 +514,29 @@ const uploadVideos = useCallback(async (
             onVideoError(video, error as Error)
           }
 
-          return null
+          return { item, result: null }
         }
       })
 
-      await Promise.all(uploadPromises)
+      const chunkResults = await Promise.all(uploadPromises)
+
+      // SEQUENTIAL PLAYLIST INSERTION:
+      // By doing this after the concurrent upload chunk finishes, we guarantee videos 
+      // are added to the playlist in exact sequential order.
+      for (const { item, result } of chunkResults) {
+        if (result && result.videoId) {
+          if (playlistId && uploadSettings.uploadMode === 'playlist') {
+            try {
+              await completeUpload(result.videoId, playlistId, item.position)
+            } catch (err) {
+              console.error('Sequential playlist insert error:', err)
+            }
+          }
+          if (onVideoComplete) {
+            onVideoComplete(item.video, result)
+          }
+        }
+      }
     }
 
   } finally {

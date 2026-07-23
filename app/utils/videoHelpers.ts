@@ -105,6 +105,24 @@ export function cleanTitleForYoutube(filename: string): string {
   return generateTitle(filename, 'original', '', '')
 }
 
+export function normalizeTitleForComparison(title: string): string {
+  if (!title) return ''
+  let normalized = title
+  
+  // 1. Decode basic HTML entities that YouTube API might return
+  normalized = normalized.replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    
+  // 2. Remove common video extensions (in case they were uploaded with 'original' format)
+  normalized = normalized.replace(/\.(mp4|mov|avi|mkv|webm|flv|wmv)$/i, '')
+  
+  // 3. Trim and lowercase
+  return normalized.trim().toLowerCase()
+}
+
 export function checkForDuplicateVideos(
   videos: MediaFile[],
   existingVideos: Array<{videoId: string, title: string, position: number}>,
@@ -119,11 +137,11 @@ export function checkForDuplicateVideos(
     const basename = getBasename(video.file.name)
     const videoTitle = generateTitle(basename, titleFormat, customTitlePrefix, customTitleSuffix)
 
-    // Check for exact title match
+    // Check for exact title match using normalized comparison
     const isDuplicate = existingVideos.some(existing => {
-      const existingTitle = existing.title.trim()
-      const newTitle = videoTitle.trim()
-      return existingTitle.toLowerCase() === newTitle.toLowerCase()
+      const existingTitle = normalizeTitleForComparison(existing.title)
+      const newTitle = normalizeTitleForComparison(videoTitle)
+      return existingTitle === newTitle
     })
 
     if (isDuplicate) {
@@ -149,15 +167,14 @@ export function calculateInsertionPositions(
   // Generate titles for all folder videos (use basename for consistency)
   const videoTitles = videos.map(video => {
     const basename = getBasename(video.file.name)
-    return generateTitle(basename, titleFormat, customTitlePrefix, customTitleSuffix)
-      .trim()
-      .toLowerCase()
+    const generated = generateTitle(basename, titleFormat, customTitlePrefix, customTitleSuffix)
+    return normalizeTitleForComparison(generated)
   })
 
-  // Map existing videos by title (lowercase)
+  // Map existing videos by title (normalized)
   const existingByTitle = new Map<string, {position: number, index: number}>()
   existingVideos.forEach(existing => {
-    const title = existing.title.trim().toLowerCase()
+    const title = normalizeTitleForComparison(existing.title)
     existingByTitle.set(title, {position: existing.position, index: -1})
   })
 
