@@ -43,21 +43,26 @@ export function FileProvider({ children }: { children: React.ReactNode }) {
       
       pendingAnalysisRef.current.set(mediaFile.path, true)
       
+      const path = mediaFile.path
+      const name = mediaFile.name
       analyzeMedia(mediaFile.file)
         .then((analysis) => {
-          pendingAnalysisRef.current.delete(mediaFile.path)
-          const index = videos.findIndex((v) => v.path === mediaFile.path)
-          if (index !== -1) {
-            const updated = updateMediaFileWithAnalysis(videos[index], analysis)
-            updateVideo(index, updated)
-          }
+          pendingAnalysisRef.current.delete(path)
+          setVideos((prev) => {
+            const index = prev.findIndex((v) => v.path === path)
+            if (index === -1) return prev
+            const updated = updateMediaFileWithAnalysis(prev[index], analysis)
+            const next = [...prev]
+            next[index] = updated
+            return next
+          })
         })
         .catch((error) => {
-          console.error(`Failed to analyze ${mediaFile.name}:`, error)
-          pendingAnalysisRef.current.delete(mediaFile.path)
+          console.error(`Failed to analyze ${name}:`, error)
+          pendingAnalysisRef.current.delete(path)
         })
     })
-  }, [videos, updateVideo])
+  }, [setVideos])
 
   const createMediaFiles = useCallback((files: File[]): MediaFile[] => {
     const validFiles: MediaFile[] = []

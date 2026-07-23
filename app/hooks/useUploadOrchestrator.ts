@@ -5,6 +5,7 @@ import { MediaFile, UploadSettings, YouTubePlaylistVideo } from '@/app/types/vid
 import { generateTitle, getBasename, calculateInsertionPositions, normalizeTitleForComparison } from '@/app/utils/videoHelpers'
 import type { UploadQueueItem } from './useVideoUpload'
 import { createPlaylist } from '@/app/actions/playlist'
+import { getUploadHistory } from '@/app/actions/history'
 
 interface OrchestratorDeps {
   session: { accessToken?: string } | null
@@ -131,21 +132,46 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
           }
         }
 
-        // Phase 2: Generate metadata from filenames (no AI)
-        const processedVideos = initialVideosToProcess.map(video => ({
-          video,
-          metadata: {
-            title: generateTitle(
+        // Phase 2: Generate metadata from filenames
+        const processedVideos = await Promise.all(
+          initialVideosToProcess.map(async (video) => {
+            const defaultTitle = generateTitle(
               getBasename(video.file.name),
               uploadSettings.titleFormat,
               uploadSettings.customTitlePrefix,
               uploadSettings.customTitleSuffix
-            ),
-            description: '',
-            tags: [] as string[],
-            category: video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
-          }
-        }))
+            )
+            let metadata = {
+              title: defaultTitle,
+              description: '',
+              tags: [] as string[],
+              category: video.mediaType === 'audio' ? uploadSettings.audioCategory : uploadSettings.category
+            }
+
+            if (uploadSettings.generateAIMetadata) {
+              try {
+                console.log(`Generating AI metadata for ${video.file.name}...`)
+                const aiResponse = await fetch('/api/generate-metadata', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ filename: video.file.name }),
+                })
+
+                if (aiResponse.ok) {
+                  const aiData = await aiResponse.json()
+                  metadata.description = aiData.description || metadata.description
+                  metadata.tags = aiData.tags || metadata.tags
+                } else {
+                  console.warn(`AI metadata generation failed for ${video.file.name}`)
+                }
+              } catch (aiErr) {
+                console.error('Error fetching AI metadata:', aiErr)
+              }
+            }
+
+            return { video, metadata }
+          })
+        )
 
         // Phase 3: Filter duplicates
         let videosToProcess = processedVideos
@@ -157,15 +183,34 @@ export function useUploadOrchestrator(deps: OrchestratorDeps) {
           }
         }
 
-        if (uploadSettings.uploadMode === 'playlist' && existingTitles.size > 0) {
+        const existingFileNames = new Set<string>()
+        if (playlistId) {
+          try {
+            const history = await getUploadHistory({ playlistId, limit: 1000 })
+            history.uploads.forEach(u => {
+              if (u.fileName) existingFileNames.add(u.fileName)
+            })
+          } catch (err) {
+            console.error('Failed to fetch upload history for deduplication:', err)
+          }
+        }
+
+        if (uploadSettings.uploadMode === 'playlist' && (existingTitles.size > 0 || existingFileNames.size > 0)) {
           videosToProcess = processedVideos.filter(pv => {
             const videoTitle = pv.metadata?.title || ''
             const normalizedTitle = normalizeTitleForComparison(videoTitle)
-            const isDuplicate = existingTitles.has(normalizedTitle)
-            if (isDuplicate) {
-              console.log(`Skipping duplicate video: ${videoTitle}`)
+            const isDuplicateTitle = existingTitles.has(normalizedTitle)
+            const isDuplicateFile = existingFileNames.has(pv.video.file.name)
+            
+            if (isDuplicateFile) {
+              console.log(`Skipping duplicate video (found in local history): ${pv.video.file.name}`)
+              return false
             }
-            return !isDuplicate
+            if (isDuplicateTitle) {
+              console.log(`Skipping duplicate video (found in YouTube playlist): ${videoTitle}`)
+              return false
+            }
+            return true
           })
 
           const skippedCount = processedVideos.length - videosToProcess.length

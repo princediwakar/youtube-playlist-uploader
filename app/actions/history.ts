@@ -54,6 +54,7 @@ export async function getUploadHistory(params?: {
   page?: number
   limit?: number
   search?: string
+  playlistId?: string
 }): Promise<GetUploadHistoryResult> {
   const session = await auth()
   if (!session?.accessToken) {
@@ -63,18 +64,38 @@ export async function getUploadHistory(params?: {
   const page = params?.page || 1
   const limit = params?.limit || 20
   const offset = (page - 1) * limit
+  const playlistId = params?.playlistId
 
   await initDb()
 
-  const { rows } = await sql<UploadHistoryRow>`
-    SELECT id, video_id, title, playlist_id, file_name, file_size, media_type, uploaded_at
-    FROM upload_history
-    ORDER BY uploaded_at DESC
-    LIMIT ${limit}
-    OFFSET ${offset}
-  `
+  let rows;
+  let countRows;
 
-  const { rows: countRows } = await sql`SELECT COUNT(*) as total FROM upload_history`
+  if (playlistId) {
+    const result = await sql<UploadHistoryRow>`
+      SELECT id, video_id, title, playlist_id, file_name, file_size, media_type, uploaded_at
+      FROM upload_history
+      WHERE playlist_id = ${playlistId}
+      ORDER BY uploaded_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+    rows = result.rows
+    const countResult = await sql`SELECT COUNT(*) as total FROM upload_history WHERE playlist_id = ${playlistId}`
+    countRows = countResult.rows
+  } else {
+    const result = await sql<UploadHistoryRow>`
+      SELECT id, video_id, title, playlist_id, file_name, file_size, media_type, uploaded_at
+      FROM upload_history
+      ORDER BY uploaded_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+    rows = result.rows
+    const countResult = await sql`SELECT COUNT(*) as total FROM upload_history`
+    countRows = countResult.rows
+  }
+
   const total = Number(countRows[0]?.total) || 0
 
   return {

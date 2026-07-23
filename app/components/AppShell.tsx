@@ -1,7 +1,7 @@
 'use client'
 
 import { useSession, signIn, signOut } from 'next-auth/react'
-import { Youtube, User, LogOut, History } from 'lucide-react'
+import { Youtube, User, LogOut, History, Sparkles } from 'lucide-react'
 import LandingPage from '@/app/components/LandingPage'
 import UploadScreen from '@/app/components/UploadScreen'
 import type { Session } from 'next-auth'
@@ -52,6 +52,13 @@ export default function AppShell({ session }: AppShellProps) {
                     </span>
                   </div>
                   <a
+                    href="/tools"
+                    className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"
+                  >
+                    <Sparkles className="mr-1.5 sm:mr-2" size={14} />
+                    <span className="hidden sm:inline">Free Tools</span>
+                  </a>
+                  <a
                     href="/history"
                     className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"
                   >
@@ -67,13 +74,22 @@ export default function AppShell({ session }: AppShellProps) {
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => signIn('google')}
-                  className="btn-primary flex items-center py-2 px-4 md:py-3 md:px-6 text-xs md:text-sm"
-                >
-                  <User className="mr-2 md:mr-3" size={16} />
-                  Sign In
-                </button>
+                <div className="flex items-center space-x-3">
+                  <a
+                    href="/tools"
+                    className="flex items-center text-yt-text-secondary hover:text-yt-text-primary text-xs sm:text-sm font-medium transition-colors duration-200 px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full hover:bg-yt-hover"
+                  >
+                    <Sparkles className="mr-1.5 sm:mr-2" size={14} />
+                    <span className="hidden sm:inline">Free Tools</span>
+                  </a>
+                  <button
+                    onClick={() => signIn('google')}
+                    className="btn-primary flex items-center py-2 px-4 md:py-3 md:px-6 text-xs md:text-sm"
+                  >
+                    <User className="mr-2 md:mr-3" size={16} />
+                    Sign In
+                  </button>
+                </div>
               )}
             </div>
           </div>

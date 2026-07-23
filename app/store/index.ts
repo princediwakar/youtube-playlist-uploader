@@ -117,6 +117,7 @@ const defaultSettings: UploadSettings = {
   selectedPlaylistId: '',
   audioCategory: '10',
   generateAudioFrames: true,
+  generateAIMetadata: false,
 }
 
 const initialState: AppState = {

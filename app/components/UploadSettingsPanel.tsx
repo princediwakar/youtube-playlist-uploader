@@ -179,6 +179,33 @@ export function UploadSettingsPanel() {
         </div>
       </div>
 
+      {/* AI Metadata Generation */}
+      <div className="mt-6 pt-4 border-t border-yt-border">
+        <label className="flex items-start space-x-3 group cursor-pointer">
+          <div className="relative flex mt-0.5">
+            <input
+              type="checkbox"
+              checked={uploadSettings.generateAIMetadata}
+              onChange={(e) => setUploadSettings(prev => ({
+                ...prev, generateAIMetadata: e.target.checked
+              }))}
+              className="sr-only"
+            />
+            <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${uploadSettings.generateAIMetadata ? 'bg-yt-blue border-yt-blue' : 'border-yt-text-secondary group-hover:border-yt-text-primary'}`}>
+              {uploadSettings.generateAIMetadata && <Check size={14} className="text-yt-bg" />}
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-yt-text-primary mb-0.5 flex items-center gap-1.5">
+              ✨ Generate Video Descriptions Automatically 
+            </span>
+            <span className="text-xs text-yt-text-secondary">
+              Automatically writes SEO metadata for all videos in the queue based on filenames.
+            </span>
+          </div>
+        </label>
+      </div>
+
       {/* Advanced Settings */}
       <div className="mt-6 pt-4 border-t border-yt-border">
         <button

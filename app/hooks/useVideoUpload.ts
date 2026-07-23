@@ -402,12 +402,13 @@ const uploadVideo = useCallback(async (
   }
 }, [session?.accessToken, setCurrentUpload])
 
-const updateStats = useCallback((completed: number, uploadedBytes: number, total: number, startTime: number) => {
+const updateStats = useCallback((_completed: number, uploadedBytes: number, total: number, startTime: number) => {
   if (!statsRef.current) return
 
   const elapsed = (Date.now() - startTime) / 1000
-  const progress = total > 0 ? completed / total : 0
-  const estimatedTotal = progress > 0 ? elapsed / progress : 0
+  const totalBytes = statsRef.current.totalBytes
+  const bytesProgress = totalBytes > 0 ? uploadedBytes / totalBytes : 0
+  const estimatedTotal = bytesProgress > 0 ? elapsed / bytesProgress : 0
   const remaining = Math.max(0, estimatedTotal - elapsed)
 
   statsRef.current = {

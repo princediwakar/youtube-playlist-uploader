@@ -24,6 +24,8 @@ export interface UploadSettings {
   // Audio-specific settings
   audioCategory: string
   generateAudioFrames: boolean
+  // AI Settings
+  generateAIMetadata: boolean
 }
 
 export interface PlaylistItem {

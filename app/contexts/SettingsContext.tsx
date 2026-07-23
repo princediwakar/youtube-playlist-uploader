@@ -29,8 +29,9 @@ const defaultSettings: UploadSettings = {
   addPlaylistNavigation: true,
   useExistingPlaylist: false,
   selectedPlaylistId: '',
-  audioCategory: '10',
+  audioCategory: '22',
   generateAudioFrames: true,
+  generateAIMetadata: false,
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
