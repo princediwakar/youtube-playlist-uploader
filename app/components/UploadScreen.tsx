@@ -31,6 +31,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
   const { uploadSettings, setUploadSettings, setCurrentPlaylistId, authError, setAuthError } = useSettingsContext()
 
   const [isPhotosPickerOpen, setIsPhotosPickerOpen] = useState(false)
+  const [pickerWindow, setPickerWindow] = useState<Window | null>(null)
   const [isUploadCardsExpanded, setIsUploadCardsExpanded] = useState(true)
   const [showRestoreSession, setShowRestoreSession] = useState(false)
   const [isTouchDevice] = useState(() => {
@@ -122,6 +123,7 @@ export default function UploadScreen({ session }: UploadScreenProps) {
     }))
 
     setIsPhotosPickerOpen(false)
+    setPickerWindow(null)
     setIsUploadCardsExpanded(false)
   }, [replaceVideos, setVideos])
 
@@ -408,10 +410,42 @@ export default function UploadScreen({ session }: UploadScreenProps) {
               role="button"
               tabIndex={0}
               aria-label="Import from Google Photos"
-              onClick={() => setIsPhotosPickerOpen(true)}
+              onClick={() => {
+                const w = window.open('', '_blank')
+                if (w) {
+                  w.document.write(`
+                    <html>
+                      <head><title>Google Photos</title></head>
+                      <body style="font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #0f0f0f; color: #fff; margin: 0;">
+                        <div style="text-align: center;">
+                          <h2 style="margin-bottom: 8px;">Connecting to Google Photos...</h2>
+                          <p style="color: #aaa;">Please wait while we create a secure session.</p>
+                        </div>
+                      </body>
+                    </html>
+                  `)
+                }
+                setPickerWindow(w)
+                setIsPhotosPickerOpen(true)
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
+                  const w = window.open('', '_blank')
+                  if (w) {
+                    w.document.write(`
+                      <html>
+                        <head><title>Google Photos</title></head>
+                        <body style="font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background: #0f0f0f; color: #fff; margin: 0;">
+                          <div style="text-align: center;">
+                            <h2 style="margin-bottom: 8px;">Connecting to Google Photos...</h2>
+                            <p style="color: #aaa;">Please wait while we create a secure session.</p>
+                          </div>
+                        </body>
+                      </html>
+                    `)
+                  }
+                  setPickerWindow(w)
                   setIsPhotosPickerOpen(true)
                 }
               }}
@@ -495,8 +529,15 @@ export default function UploadScreen({ session }: UploadScreenProps) {
       {isPhotosPickerOpen && (
         <GooglePhotosPicker
           isOpen={isPhotosPickerOpen}
-          onClose={() => setIsPhotosPickerOpen(false)}
+          onClose={() => {
+            setIsPhotosPickerOpen(false)
+            if (pickerWindow && !pickerWindow.closed) {
+              pickerWindow.close()
+            }
+            setPickerWindow(null)
+          }}
           onImport={handleGooglePhotosImport}
+          initialWindow={pickerWindow}
         />
       )}
 

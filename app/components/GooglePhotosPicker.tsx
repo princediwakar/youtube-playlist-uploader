@@ -10,6 +10,7 @@ interface GooglePhotosPickerProps {
   isOpen: boolean
   onClose: () => void
   onImport: (items: GooglePhotosImportItem[]) => void
+  initialWindow?: Window | null
 }
 
 type PickerStatus = 'creating' | 'picking' | 'retrieving' | 'done'
@@ -20,7 +21,7 @@ function isMobileBrowser(): boolean {
   return /iPhone|iPad|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua))
 }
 
-export default function GooglePhotosPicker({ isOpen, onClose, onImport }: GooglePhotosPickerProps) {
+export default function GooglePhotosPicker({ isOpen, onClose, onImport, initialWindow }: GooglePhotosPickerProps) {
   const [status, setStatus] = useState<PickerStatus>('creating')
   const [error, setError] = useState<string | null>(null)
   const [needsReauth, setNeedsReauth] = useState(false)
@@ -66,25 +67,27 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
 
     const run = async () => {
       try {
-        pickerWindowRef.current = window.open('about:blank', '_blank')
+        pickerWindowRef.current = initialWindow || (isMobileBrowser() ? null : window.open('', '_blank'))
 
         let sessionData: { sessionId: string; pickerUri: string }
         try {
           sessionData = await createPhotosSession()
         } catch (err: unknown) {
           const errorMessage = err instanceof Error ? err.message : String(err)
+          if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
+             pickerWindowRef.current.document.body.innerHTML = `
+               <div style="text-align: center; font-family: system-ui, sans-serif; padding: 20px; background: #0f0f0f; color: #fff; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box; margin: 0;">
+                 <h2 style="color: #ef4444; margin-bottom: 8px;">Connection Failed</h2>
+                 <p style="color: #ddd;">${errorMessage}</p>
+                 <p style="color: #aaa; font-size: 14px; margin-top: 16px;">Please close this tab and return to the main window.</p>
+                 <button onclick="window.close()" style="margin-top: 20px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">Close Tab</button>
+               </div>
+             `
+          }
           if (errorMessage.includes('403') || errorMessage.includes('Photos permission')) {
             setNeedsReauth(true)
             setError('Google Photos permission required. Please sign out and sign in again to grant access.')
-            if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
-              pickerWindowRef.current.close()
-              pickerWindowRef.current = null
-            }
             return
-          }
-          if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
-            pickerWindowRef.current.close()
-            pickerWindowRef.current = null
           }
           throw err
         }
@@ -98,7 +101,7 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
         const pickerUrl = pickerUri.endsWith('/') ? `${pickerUri}autoclose` : `${pickerUri}/autoclose`
         if (pickerWindowRef.current && !pickerWindowRef.current.closed) {
           pickerWindowRef.current.location.href = pickerUrl
-        } else {
+        } else if (!isMobileBrowser()) {
           pickerWindowRef.current = window.open(pickerUrl, '_blank')
         }
 
@@ -150,7 +153,11 @@ export default function GooglePhotosPicker({ isOpen, onClose, onImport }: Google
               }))
 
             if (videoItems.length === 0) {
-              setError('No videos were selected. Please try again.')
+              if (data.mediaItems && data.mediaItems.length > 0) {
+                setError('You selected photos, but this tool only supports video uploads. Please try again and select video files.')
+              } else {
+                setError('No videos were selected. Please try again.')
+              }
               return
             }
 

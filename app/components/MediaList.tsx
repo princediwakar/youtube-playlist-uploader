@@ -81,7 +81,8 @@ export function MediaList({ videos, maxVideos, onRemoveVideo }: MediaListProps) 
                 {isVideoFile(video) && video.thumbnail ? (
                   <Image src={video.thumbnail} alt="" fill className="object-cover" />
                 ) : isVideoFile(video) && video.googlePhotosBaseUrl ? (
-                  <Image src={`${video.googlePhotosBaseUrl}=w300-h300`} alt="" fill className="object-cover" />
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={`/api/photos/thumbnail?baseUrl=${encodeURIComponent(video.googlePhotosBaseUrl)}`} alt="" className="object-cover w-full h-full absolute inset-0" />
                 ) : isAudioFile(video) ? (
                   video.waveform && video.waveform.length > 0 ? (
                     <CompactWaveformVisualizer
