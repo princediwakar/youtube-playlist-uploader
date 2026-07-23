@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Calendar, Clock, Tag } from 'lucide-react'
 import { getPostBySlug, blogPosts } from '@/content/blog/index'
@@ -77,13 +78,43 @@ export default async function BlogPostPage({ params }: PageProps) {
             <p className="body-lg text-slate/70">{post.description}</p>
           </header>
 
+          {post.coverImage && (
+            <div className="relative w-full aspect-video mb-12 rounded-xl overflow-hidden border border-slate/10 shadow-sm">
+              <Image
+                src={post.coverImage}
+                alt={post.title}
+                fill
+                priority
+                className="object-cover"
+              />
+            </div>
+          )}
+
           <div
             className="prose-custom"
             dangerouslySetInnerHTML={{ __html: htmlContent }}
           />
         </article>
 
-        <div className="mt-16 pt-8 border-t border-slate/20">
+        {post.author && (
+          <div className="mt-12 p-6 bg-slate/5 rounded-xl border border-slate/10 flex items-start gap-4">
+            {post.author.avatarUrl && (
+              <Image
+                src={post.author.avatarUrl}
+                alt={post.author.name}
+                width={64}
+                height={64}
+                className="rounded-full object-cover flex-shrink-0"
+              />
+            )}
+            <div>
+              <h3 className="heading-md mb-2">{post.author.name}</h3>
+              <p className="body-md text-slate/70">{post.author.bio}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-12 pt-8 border-t border-slate/20">
           <Link
             href="/blog"
             className="inline-flex items-center text-sm text-slate hover:text-charcoal transition-colors"

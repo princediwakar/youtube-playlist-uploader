@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowLeft, Calendar, Clock, Tag } from 'lucide-react'
 import { blogPosts } from '@/content/blog/index'
 
@@ -31,6 +32,16 @@ export default function BlogIndexPage() {
               className="card card-hover group"
             >
               <Link href={`/blog/${post.slug}`} className="block">
+                {post.coverImage && (
+                  <div className="relative w-full h-48 mb-4 rounded-lg overflow-hidden">
+                    <Image
+                      src={post.coverImage}
+                      alt={post.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-xs text-slate/70 mb-3">
                   <span className="inline-flex items-center gap-1">
                     <Calendar size={12} />

@@ -6,8 +6,49 @@ function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;')
 }
 
+const KEYWORD_LINKS = [
+  { regex: /\b(title generat(?:ion|or)s?)\b/gi, url: '/tools/title-generator' },
+  { regex: /\b(description generat(?:ion|or)s?)\b/gi, url: '/tools/description-generator' },
+  { regex: /\b(tag generat(?:ion|or)s?)\b/gi, url: '/tools/tag-generator' },
+  { regex: /\b(idea generat(?:ion|or)s?)\b/gi, url: '/tools/idea-generator' },
+  { regex: /\b(gaming|gamers?)\b/gi, url: '/use-cases/bulk-upload-gaming-videos' },
+  { regex: /\b(podcast(?:ers?)?)\b/gi, url: '/use-cases/bulk-upload-for-podcasters' },
+]
+
+function autoLinkText(text: string): string {
+  // We want to avoid replacing text inside existing markdown links [text](url) or code blocks `code`
+  // A simple way is to tokenize by existing links and code blocks, and only replace in plain text parts.
+  
+  // Regex to match markdown links or code blocks
+  const tokenRegex = /(\[[^\]]+\]\([^)]+\)|`[^`]+`)/g;
+  const parts = text.split(tokenRegex);
+  
+  for (let i = 0; i < parts.length; i++) {
+    // Even indices are plain text, odd indices are matched tokens
+    if (i % 2 === 0) {
+      let part = parts[i];
+      for (const { regex, url } of KEYWORD_LINKS) {
+        // Only replace the first occurrence in the part to avoid over-linking, or replace all?
+        // Usually replacing all is fine, but we replace with a markdown link.
+        // Wait, if a keyword is "gaming", and we replace with `[gaming](/use-cases/...)`, 
+        // we must make sure we don't recursively replace it again if the regex matches.
+        // But since we only run each regex once, it's fine.
+        // However, if one regex matches a word that gets put into a link, and a subsequent regex matches something inside that new link?
+        // Our KEYWORD_LINKS are distinct enough, but to be safe, we can build the tokens dynamically.
+        part = part.replace(regex, (match) => `[${match}](${url})`);
+      }
+      parts[i] = part;
+    }
+  }
+  
+  return parts.join('');
+}
+
 function inlineToHtml(text: string): string {
-  return escapeHtml(text)
+  // First, apply our automated internal linking
+  const autoLinkedText = autoLinkText(text);
+
+  return escapeHtml(autoLinkedText)
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/_(.+?)_/g, '<em>$1</em>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')

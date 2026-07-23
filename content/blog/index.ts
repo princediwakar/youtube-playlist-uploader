@@ -1,3 +1,9 @@
+export interface Author {
+  name: string
+  bio: string
+  avatarUrl: string
+}
+
 export interface BlogPost {
   slug: string
   title: string
@@ -7,6 +13,8 @@ export interface BlogPost {
   readingTime: string
   content: string
   published: boolean
+  coverImage?: string
+  author?: Author
 }
 
 import { ultimateYoutubeAutomationGuide } from './ultimate-youtube-automation-guide'

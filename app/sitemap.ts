@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next'
 import { blogPosts } from '@/content/blog/index'
 import { useCases, alternatives } from '@/lib/seo-data'
-
+import { getUseCases, getAlternatives } from '@/lib/get-seo-data'
+import { i18n } from '@/lib/i18n.config'
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://youtube-playlist-uploader.vercel.app'
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -12,19 +13,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.8,
   }))
 
-  const pSeoUseCases = useCases.map((uc) => ({
-    url: `${BASE_URL}/use-cases/${uc.slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.7,
-  }))
+  const pSeoUseCases = []
+  const pSeoAlternatives = []
 
-  const pSeoAlternatives = alternatives.map((alt) => ({
-    url: `${BASE_URL}/alternatives/${alt.slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'monthly' as const,
-    priority: 0.7,
-  }))
+  for (const locale of i18n.locales) {
+    const locUseCases = getUseCases(locale)
+    const locAlternatives = getAlternatives(locale)
+
+    locUseCases.forEach((uc: any) => {
+      pSeoUseCases.push({
+        url: `${BASE_URL}/${locale}/use-cases/${uc.slug}`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      })
+    })
+
+    locAlternatives.forEach((alt: any) => {
+      pSeoAlternatives.push({
+        url: `${BASE_URL}/${locale}/alternatives/${alt.slug}`,
+        lastModified: new Date(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      })
+    })
+  }
 
   return [
     { url: BASE_URL, lastModified: new Date(), changeFrequency: 'weekly', priority: 1.0 },

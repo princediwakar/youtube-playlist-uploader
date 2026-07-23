@@ -37,10 +37,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account) {
         t.accessToken = account.access_token
         t.refreshToken = account.refresh_token
-        t.accessTokenExpires = account.expires_at
+        t.accessTokenExpires = (account.expires_at as number) * 1000 // Convert seconds to ms
       }
 
-      if (Date.now() < (t.accessTokenExpires as number) * 1000) {
+      if (Date.now() < (t.accessTokenExpires as number)) {
         return token
       }
 

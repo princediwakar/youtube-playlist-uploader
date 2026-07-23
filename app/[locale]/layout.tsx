@@ -1,8 +1,8 @@
-import './globals.css'
+import '../globals.css'
 import { Inter, Playfair_Display } from 'next/font/google'
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
-import Providers from './providers'
+import Providers from '../providers'
 import { SchemaMarkup } from '@/components/seo/schema-markup'
 const inter = Inter({
   subsets: ['latin'],
@@ -80,13 +80,16 @@ export const viewport = {
 
 export default async function RootLayout({
   children,
+  params,
 }: {
   children: React.ReactNode
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const session = await auth()
 
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang={locale} className={`${inter.variable} ${playfair.variable}`}>
       <body className="bg-pearl text-charcoal font-sans antialiased selection:bg-yt-red selection:text-white">
         <Providers session={session}>
           <SchemaMarkup type="SoftwareApplication" data={{}} />
